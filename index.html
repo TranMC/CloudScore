@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quản lý điểm – jQuery + Google Sheets</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <style>
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;padding:24px;background:#0b1220;color:#e7ecf3}
+    h1{font-size:22px;margin:0 0 16px}
+    .card{background:#121a2b;border:1px solid #1f2940;border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+    label{display:block;margin-bottom:6px;color:#8fb3ff}
+    input,select{width:100%;padding:10px;border-radius:10px;border:1px solid #2a3552;background:#0e1730;color:#e7ecf3}
+    table{width:100%;border-collapse:separate;border-spacing:0 10px}
+    th,td{padding:12px 10px}
+    th{color:#8fb3ff;text-align:left;border-bottom:1px solid #243156}
+    tr{background:#0e1730;border:1px solid #1d2a4a}
+    tr:hover{background:#122043}
+    .row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .btn{padding:10px 14px;border-radius:10px;border:1px solid #2a3552;background:#1a2747;color:#e7ecf3;cursor:pointer}
+    .btn.primary{background:#2e5cff;border-color:#2e5cff}
+    .btn.danger{background:#b91c1c;border-color:#b91c1c}
+    .toolbar{display:flex;gap:8px;margin-bottom:12px}
+    .muted{opacity:.75;font-size:12px}
+  </style>
+</head>
+<body>
+  <h1>Quản lý điểm – 3 tác vụ: Thêm / Sửa / Xoá</h1>
+
+  <div class="card">
+    <div class="toolbar">
+      <input id="search" placeholder="Tìm theo tên / lớp / mã HS..." />
+      <button id="btnReload" class="btn">Tải lại</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Lớp</th>
+          <th>Mã HS</th>
+          <th>Họ tên</th>
+          <th>Giữa kỳ</th>
+          <th>Cuối kỳ</th>
+          <th>TB</th>
+          <th>Cập nhật</th>
+          <th>Hành động</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="muted" id="status"></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 10px;font-size:18px">Thêm / Cập nhật</h2>
+    <div class="row">
+      <div>
+        <label>Lớp</label>
+        <input id="class" />
+      </div>
+      <div>
+        <label>Mã HS</label>
+        <input id="student_id" />
+      </div>
+      <div>
+        <label>Họ tên</label>
+        <input id="name" />
+      </div>
+      <div>
+        <label>Điểm GK</label>
+        <input id="midterm" type="number" step="0.01" />
+      </div>
+      <div>
+        <label>Điểm CK</label>
+        <input id="final" type="number" step="0.01" />
+      </div>
+      <div>
+        <label>ID (để sửa mục đã có)</label>
+        <input id="id" placeholder="Để trống nếu thêm mới" />
+      </div>
+    </div>
+    <div class="toolbar" style="margin-top:12px">
+      <button id="btnSave" class="btn primary">Lưu</button>
+      <button id="btnClear" class="btn">Clear form</button>
+    </div>
+  </div>
+
+<script>
+  // ========== CẤU HÌNH ==========
+  const API = {
+    // Apps Script Web App URL (đích GET bằng JSONP)
+    url: 'https://script.google.com/macros/s/AKfycbxp3lai5nreElmbAGS4IhrkJNbcamMdALJkLRBBkdess9v37udR6mKsXRBJlbtD1Vfoew/exec',
+    key: 'yourmamaisgei'
+  };
+  // Cloudflare Worker (đích POST để bypass CORS)
+  const PROXY_URL = 'https://proxyscore.mctran2005.workers.dev/'; // <-- điền URL Worker
+
+  function fmt(n){ return Number(n||0).toFixed(2); }
+
+  // === GET bằng JSONP (không CORS) ===
+  function load(q=''){
+    $('#status').text('Đang tải...');
+    $.ajax({
+      url: API.url,
+      data: { key: API.key, q },            // KHÔNG cần origin
+      dataType: 'jsonp',                    // 👈 bật JSONP
+      jsonp: 'callback'                     // 👈 Apps Script nhận param "callback"
+    }).done(res => {
+      if (!res.ok){ $('#status').text(res.error||'Lỗi'); return; }
+      const rows = res.data || [];
+      const $tb = $('#tbody').empty();
+      rows.forEach(r => {
+        const tr = $(`
+          <tr>
+            <td>${r.class||''}</td>
+            <td>${r.student_id||''}</td>
+            <td>${r.name||''}</td>
+            <td>${fmt(r.midterm)}</td>
+            <td>${fmt(r.final)}</td>
+            <td>${fmt(r.average)}</td>
+            <td>${r.updated_at||''}</td>
+            <td>
+              <button class="btn" data-act="edit" data-id="${r.id}">Sửa</button>
+              <button class="btn danger" data-act="del" data-id="${r.id}">Xoá</button>
+            </td>
+          </tr>`);
+        $tb.append(tr);
+      });
+      $('#status').text(`${rows.length} bản ghi`);
+    }).fail(()=> $('#status').text('Không truy cập được API'));
+  }
+
+  // === POST qua PROXY (bypass CORS) ===
+  function save(){
+    const id = $('#id').val().trim();
+    const record = {
+      class: $('#class').val().trim(),
+      student_id: $('#student_id').val().trim(),
+      name: $('#name').val().trim(),
+      midterm: $('#midterm').val(),
+      final: $('#final').val()
+    };
+
+    const body = { key: API.key };
+    if (id) { body.action='update'; body.id=id; body.record=record; }
+    else    { body.action='create'; body.record=record; }
+
+    $.ajax({
+      url: PROXY_URL,                        // 👈 gọi qua proxy
+      method: 'POST',
+      data: JSON.stringify(body),
+      contentType: 'application/json'
+    })
+    .done(res => {
+      if (res.ok){ load($('#search').val()); clearForm(); }
+      else alert(res.error||'Lỗi');
+    })
+    .fail(()=> alert('Không truy cập được PROXY'));
+  }
+
+  function del(id){
+    const body = { key: API.key, action:'delete', id };
+
+    $.ajax({
+      url: PROXY_URL,                        // 👈 gọi qua proxy
+      method: 'POST',
+      data: JSON.stringify(body),
+      contentType: 'application/json'
+    })
+    .done(res => { if (res.ok){ load($('#search').val()); } else alert(res.error||'Lỗi'); })
+    .fail(()=> alert('Không truy cập được PROXY'));
+  }
+
+  function clearForm(){ $('input').val(''); }
+
+  // Events
+  $(document).on('click','[data-act="edit"]',function(){
+    const tr = $(this).closest('tr');
+    $('#class').val(tr.children().eq(0).text());
+    $('#student_id').val(tr.children().eq(1).text());
+    $('#name').val(tr.children().eq(2).text());
+    $('#midterm').val(tr.children().eq(3).text());
+    $('#final').val(tr.children().eq(4).text());
+    $('#id').val($(this).data('id'));
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+
+  $(document).on('click','[data-act="del"]',function(){
+    if (confirm('Xoá bản ghi này?')) del($(this).data('id'));
+  });
+
+  $('#btnReload').on('click', ()=> load($('#search').val()));
+  $('#btnSave').on('click', save);
+  $('#btnClear').on('click', clearForm);
+  $('#search').on('input', function(){ load($(this).val()); });
+
+  // Init
+  load();
+</script>
+</body>
+</html>
