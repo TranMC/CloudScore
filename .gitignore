@@ -19,7 +19,7 @@ npm-debug.log*
 # Optional config (nếu có file config local)
 config.local.js
 cloudflare-worker.js
-google-apps-script.js
+google-apps-script-new.js
 # Backup files
 *.bak
 google
