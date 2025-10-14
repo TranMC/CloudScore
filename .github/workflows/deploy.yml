@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Create config.js and Deploy to GitHub Pages
 
 on:
   push:
