@@ -1,5 +1,8 @@
 # .gitignore cho CloudScore
 
+# Configuration (chứa thông tin nhạy cảm)
+config.js
+
 # OS files
 .DS_Store
 Thumbs.db
