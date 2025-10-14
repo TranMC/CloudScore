@@ -4,14 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CloudScore - Quản lý điểm học sinh</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <!-- SheetJS for Excel import -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="config.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>CloudScore - Hệ thống quản lý điểm</h1>
-            <button id="addRecordBtn" class="btn-primary">+ Thêm bản ghi mới</button>
+            <div class="header-actions">
+                <button id="importExcelBtn" class="btn-secondary">📊 Import Excel</button>
+                <button id="addRecordBtn" class="btn-primary">+ Thêm bản ghi mới</button>
+            </div>
         </header>
 
         <div id="searchBar">
@@ -28,45 +36,84 @@
     <!-- Modal chi tiết nhóm -->
     <div id="detailModal" class="modal">
         <div class="modal-content modal-large">
-            <span class="close">&times;</span>
-            <h2 id="modalTitle">Chi tiết bản ghi</h2>
-            
-            <div class="detail-section">
-                <div class="info-group">
-                    <label>Tên bản ghi:</label>
-                    <input type="text" id="recordName" placeholder="VD: 6A8 - Bản ghi 10/10/2025">
-                </div>
-                
-                <div class="info-group">
-                    <label>Lớp:</label>
-                    <input type="text" id="recordClass" placeholder="Nhập lớp (VD: 6A8)">
-                </div>
+            <div class="modal-header">
+                <h2 id="modalTitle">
+                    <span class="modal-icon">📋</span>
+                    Chi tiết bản ghi
+                </h2>
+                <span class="close">&times;</span>
             </div>
-
-            <div class="scores-section">
-                <div class="section-header">
-                    <h3>Danh sách học sinh</h3>
-                    <div>
-                        <button id="addColumnBtn" class="btn-small">+ Thêm cột điểm</button>
-                        <button id="addStudentBtn" class="btn-small">+ Thêm học sinh</button>
-                        <button id="batchImportBtn" class="btn-small">📥 Import hàng loạt</button>
+            
+            <div class="modal-body">
+                <div class="detail-section">
+                    <div class="info-group">
+                        <label>
+                            <span class="label-icon">📝</span>
+                            Tên bản ghi:
+                        </label>
+                        <input type="text" id="recordName" placeholder="VD: 6A8 - Bản ghi 10/10/2025">
+                    </div>
+                    
+                    <div class="info-group">
+                        <label>
+                            <span class="label-icon">🏫</span>
+                            Lớp:
+                        </label>
+                        <input type="text" id="recordClass" placeholder="Nhập lớp (VD: 6A8)">
                     </div>
                 </div>
-                
-                <div id="studentsTable">
-                    <!-- Bảng học sinh sẽ được tạo ở đây -->
+
+                <div class="scores-section">
+                    <div class="section-header">
+                        <h3>
+                            <span class="section-icon">👥</span>
+                            Danh sách học sinh
+                        </h3>
+                        <div class="section-actions">
+                            <button id="addColumnBtn" class="btn-small btn-icon-text">
+                                <span>➕</span> Thêm cột điểm
+                            </button>
+                            <button id="addStudentBtn" class="btn-small btn-icon-text">
+                                <span>👤</span> Thêm học sinh
+                            </button>
+                            <button id="batchImportBtn" class="btn-small btn-icon-text">
+                                <span>📥</span> Import hàng loạt
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="studentsTable">
+                        <!-- Bảng học sinh sẽ được tạo ở đây -->
+                    </div>
+                </div>
+
+                <div class="metadata-section">
+                    <div class="metadata-item">
+                        <span class="metadata-icon">🕐</span>
+                        <strong>Ngày tạo/sửa:</strong>
+                        <span id="lastModified">-</span>
+                    </div>
+                    <div class="metadata-item">
+                        <span class="metadata-icon">📊</span>
+                        <strong>Số học sinh:</strong>
+                        <span id="studentCount">0</span>
+                    </div>
                 </div>
             </div>
 
-            <div class="metadata-section">
-                <p><strong>Ngày tạo/sửa:</strong> <span id="lastModified"></span></p>
-                <p><strong>Số học sinh:</strong> <span id="studentCount">0</span></p>
-            </div>
-
-            <div class="modal-actions">
-                <button id="saveBtn" class="btn-primary">💾 Lưu bản ghi</button>
-                <button id="deleteBtn" class="btn-danger">🗑️ Xóa bản ghi</button>
-                <button id="cancelBtn" class="btn-secondary">Đóng</button>
+            <div class="modal-footer">
+                <button id="saveBtn" class="btn-primary">
+                    <span class="btn-icon-prefix">💾</span>
+                    Lưu bản ghi
+                </button>
+                <button id="deleteBtn" class="btn-danger">
+                    <span class="btn-icon-prefix">🗑️</span>
+                    Xóa bản ghi
+                </button>
+                <button id="cancelBtn" class="btn-secondary">
+                    <span class="btn-icon-prefix">✖️</span>
+                    Đóng
+                </button>
             </div>
         </div>
     </div>
@@ -74,18 +121,36 @@
     <!-- Modal thêm/sửa học sinh -->
     <div id="studentModal" class="modal">
         <div class="modal-content modal-small">
-            <span class="close">&times;</span>
-            <h3 id="studentModalTitle">Thêm học sinh</h3>
-            <div class="info-group">
-                <label>Họ và tên:</label>
-                <input type="text" id="studentName" placeholder="Nhập tên học sinh">
+            <div class="modal-header">
+                <h3 id="studentModalTitle">
+                    <span class="modal-icon">👤</span>
+                    Thêm học sinh
+                </h3>
+                <span class="close">&times;</span>
             </div>
-            <div id="studentScores">
-                <!-- Các ô điểm sẽ được tạo động -->
+            
+            <div class="modal-body">
+                <div class="info-group">
+                    <label>
+                        <span class="label-icon">✏️</span>
+                        Họ và tên:
+                    </label>
+                    <input type="text" id="studentName" placeholder="Nhập tên học sinh">
+                </div>
+                <div id="studentScores">
+                    <!-- Các ô điểm sẽ được tạo động -->
+                </div>
             </div>
-            <div class="modal-actions">
-                <button id="saveStudentBtn" class="btn-primary">Lưu</button>
-                <button id="cancelStudentBtn" class="btn-secondary">Hủy</button>
+            
+            <div class="modal-footer">
+                <button id="saveStudentBtn" class="btn-primary">
+                    <span class="btn-icon-prefix">💾</span>
+                    Lưu
+                </button>
+                <button id="cancelStudentBtn" class="btn-secondary">
+                    <span class="btn-icon-prefix">✖️</span>
+                    Hủy
+                </button>
             </div>
         </div>
     </div>
@@ -93,17 +158,41 @@
     <!-- Modal import batch -->
     <div id="batchModal" class="modal">
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h3>Import danh sách học sinh</h3>
-            <p>Nhập danh sách theo format: <code>Tên, Điểm1, Điểm2, ...</code></p>
-            <p><small>Mỗi học sinh một dòng. VD: <code>Nguyễn Văn A, 8.5, 9.0</code></small></p>
-            <div class="info-group">
-                <label>Dữ liệu:</label>
-                <textarea id="batchData" rows="10" placeholder="Nguyễn Văn A, 8.5, 9.0&#10;Trần Thị B, 7.5, 8.0&#10;Lê Văn C, 9.0, 9.5"></textarea>
+            <div class="modal-header">
+                <h3>
+                    <span class="modal-icon">📥</span>
+                    Import danh sách học sinh
+                </h3>
+                <span class="close">&times;</span>
             </div>
-            <div class="modal-actions">
-                <button id="processBatchBtn" class="btn-primary">Import</button>
-                <button id="cancelBatchBtn" class="btn-secondary">Hủy</button>
+            
+            <div class="modal-body">
+                <div class="info-notice">
+                    <span class="notice-icon">ℹ️</span>
+                    <div>
+                        <p><strong>Format:</strong> <code>Tên, Điểm1, Điểm2, ...</code></p>
+                        <p><small>Mỗi học sinh một dòng. VD: <code>Nguyễn Văn A, 8.5, 9.0</code></small></p>
+                    </div>
+                </div>
+                
+                <div class="info-group">
+                    <label>
+                        <span class="label-icon">📄</span>
+                        Dữ liệu:
+                    </label>
+                    <textarea id="batchData" rows="10" placeholder="Nguyễn Văn A, 8.5, 9.0&#10;Trần Thị B, 7.5, 8.0&#10;Lê Văn C, 9.0, 9.5"></textarea>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button id="processBatchBtn" class="btn-primary">
+                    <span class="btn-icon-prefix">📥</span>
+                    Import
+                </button>
+                <button id="cancelBatchBtn" class="btn-secondary">
+                    <span class="btn-icon-prefix">✖️</span>
+                    Hủy
+                </button>
             </div>
         </div>
     </div>
@@ -111,15 +200,177 @@
     <!-- Modal thêm cột điểm -->
     <div id="columnModal" class="modal">
         <div class="modal-content modal-small">
-            <span class="close">&times;</span>
-            <h3>Thêm cột điểm mới</h3>
-            <div class="info-group">
-                <label>Tên cột:</label>
-                <input type="text" id="newColumnName" placeholder="VD: Điểm giữa kỳ, Điểm cuối kỳ...">
+            <div class="modal-header">
+                <h3>
+                    <span class="modal-icon">➕</span>
+                    Thêm cột điểm mới
+                </h3>
+                <span class="close">&times;</span>
             </div>
-            <div class="modal-actions">
-                <button id="confirmAddColumn" class="btn-primary">Thêm</button>
-                <button id="cancelAddColumn" class="btn-secondary">Hủy</button>
+            
+            <div class="modal-body">
+                <div class="info-group">
+                    <label>
+                        <span class="label-icon">📊</span>
+                        Tên cột:
+                    </label>
+                    <input type="text" id="newColumnName" placeholder="VD: Điểm giữa kỳ, Điểm cuối kỳ...">
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button id="confirmAddColumn" class="btn-primary">
+                    <span class="btn-icon-prefix">✔️</span>
+                    Thêm
+                </button>
+                <button id="cancelAddColumn" class="btn-secondary">
+                    <span class="btn-icon-prefix">✖️</span>
+                    Hủy
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Import Excel -->
+    <div id="excelModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>
+                    <span class="modal-icon">📊</span>
+                    Import dữ liệu từ Excel
+                </h3>
+                <span class="close">&times;</span>
+            </div>
+            
+            <div class="modal-body">
+                <!-- File Upload Section -->
+                <div class="excel-upload-section">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">📁</div>
+                        <h4>Chọn hoặc kéo thả file Excel vào đây</h4>
+                        <p>Hỗ trợ: .xlsx, .xls, .csv</p>
+                        <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display: none;">
+                        <button class="btn-primary" onclick="document.getElementById('excelFileInput').click()">
+                            Chọn File
+                        </button>
+                    </div>
+                </div>
+
+                <!-- File Info -->
+                <div id="fileInfo" class="file-info" style="display: none;">
+                    <div class="info-card">
+                        <span class="info-icon">📄</span>
+                        <div>
+                            <strong id="fileName">-</strong>
+                            <p id="fileSize">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Section -->
+                <div id="previewSection" style="display: none;">
+                    <div class="section-header">
+                        <h4>
+                            <span class="section-icon">👁️</span>
+                            Xem trước dữ liệu
+                        </h4>
+                        <div class="preview-controls">
+                            <label>
+                                Sheet:
+                                <select id="sheetSelector" class="sheet-select"></select>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="previewTable" class="preview-table-wrapper"></div>
+                </div>
+
+                <!-- Mapping Section -->
+                <div id="mappingSection" style="display: none;">
+                    <div class="section-header">
+                        <h4>
+                            <span class="section-icon">🔗</span>
+                            Ánh xạ cột (tự động phát hiện)
+                        </h4>
+                    </div>
+                    
+                    <div class="mapping-grid">
+                        <div class="mapping-item">
+                            <label>
+                                <span class="label-icon">👤</span>
+                                Cột tên học sinh:
+                            </label>
+                            <select id="nameColumnMap" class="mapping-select"></select>
+                        </div>
+                        
+                        <div class="mapping-item">
+                            <label>
+                                <span class="label-icon">🏫</span>
+                                Cột lớp (optional):
+                            </label>
+                            <select id="classColumnMap" class="mapping-select">
+                                <option value="">-- Không có --</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mapping-item full-width">
+                            <label>
+                                <span class="label-icon">📊</span>
+                                Các cột điểm số:
+                            </label>
+                            <div id="scoreColumnsMap" class="score-columns-map"></div>
+                        </div>
+                    </div>
+
+                    <div class="info-notice">
+                        <span class="notice-icon">💡</span>
+                        <div>
+                            <strong>Gợi ý:</strong>
+                            <p>Hệ thống đã tự động phát hiện các cột. Bạn có thể điều chỉnh nếu cần.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Section -->
+                <div id="summarySection" style="display: none;">
+                    <div class="summary-card">
+                        <h4>📋 Tổng quan dữ liệu</h4>
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <span class="summary-icon">👥</span>
+                                <div>
+                                    <strong id="totalStudents">0</strong>
+                                    <p>Học sinh</p>
+                                </div>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-icon">📊</span>
+                                <div>
+                                    <strong id="totalScores">0</strong>
+                                    <p>Cột điểm</p>
+                                </div>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-icon">🏫</span>
+                                <div>
+                                    <strong id="detectedClass">-</strong>
+                                    <p>Lớp</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button id="importExcelDataBtn" class="btn-primary" style="display: none;">
+                    <span class="btn-icon-prefix">📥</span>
+                    Import Dữ Liệu
+                </button>
+                <button id="cancelExcelBtn" class="btn-secondary">
+                    <span class="btn-icon-prefix">✖️</span>
+                    Đóng
+                </button>
             </div>
         </div>
     </div>

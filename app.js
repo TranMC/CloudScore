@@ -101,6 +101,12 @@ async function loadRecords() {
         console.log('📦 Received data:', data);
         
         allRecords = data.records || [];
+        
+        // Mark all records as existing in database
+        allRecords.forEach(record => {
+            record.existsInDatabase = true;
+        });
+        
         console.log('✅ Loaded', allRecords.length, 'records');
         
         displayCards(allRecords);
@@ -175,7 +181,8 @@ function openRecordModalById(id) {
 }
 
 function openRecordModal(record) {
-    isEditMode = record !== null;
+    // Check if this is an edit of existing record (not null AND explicitly marked as existing)
+    isEditMode = record !== null && record.existsInDatabase === true;
     currentRecord = record || {
         id: generateId(),
         recordName: '',
@@ -451,18 +458,30 @@ async function saveRecord() {
         currentRecord.scoreColumns = scoreColumns;
         currentRecord.lastModified = new Date().toISOString();
 
+        // Remove internal flag before sending to server
+        const recordToSave = { ...currentRecord };
+        delete recordToSave.existsInDatabase;
+
+        console.log('💾 Saving record:', recordToSave);
+        console.log('📤 Method:', isEditMode ? 'PUT' : 'POST');
+        console.log('🔑 Edit mode:', isEditMode);
+
         // Save to backend
         const response = await fetch(`${CONFIG.PROXY_URL}/records`, {
             method: isEditMode ? 'PUT' : 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(currentRecord)
+            body: JSON.stringify(recordToSave)
         });
 
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Save error:', errorText);
             throw new Error('Không thể lưu dữ liệu');
         }
+
+        console.log('✅ Save successful!');
 
         // Reload records
         await loadRecords();
@@ -470,7 +489,7 @@ async function saveRecord() {
         
         alert('Lưu thành công!');
     } catch (error) {
-        console.error('Error saving record:', error);
+        console.error('❌ Error saving record:', error);
         alert('Lỗi: ' + error.message);
     }
 }
@@ -510,3 +529,463 @@ function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'});
 }
+
+// ============================================
+// EXCEL IMPORT FUNCTIONALITY
+// ============================================
+
+let excelWorkbook = null;
+let excelData = null;
+let detectedMapping = {
+    nameColumn: null,
+    classColumn: null,
+    scoreColumns: []
+};
+
+// Setup Excel Import Event Listeners
+function setupExcelImportListeners() {
+    const importExcelBtn = document.getElementById('importExcelBtn');
+    const excelModal = document.getElementById('excelModal');
+    const cancelExcelBtn = document.getElementById('cancelExcelBtn');
+    const excelFileInput = document.getElementById('excelFileInput');
+    const uploadArea = document.getElementById('uploadArea');
+    const sheetSelector = document.getElementById('sheetSelector');
+    const importExcelDataBtn = document.getElementById('importExcelDataBtn');
+
+    // Open modal
+    importExcelBtn.addEventListener('click', () => {
+        excelModal.style.display = 'block';
+        resetExcelModal();
+    });
+
+    // Close modal
+    cancelExcelBtn.addEventListener('click', () => {
+        excelModal.style.display = 'none';
+        resetExcelModal();
+    });
+
+    // File input change
+    excelFileInput.addEventListener('change', handleFileSelect);
+
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            processExcelFile(file);
+        }
+    });
+
+    // Sheet selector change
+    sheetSelector.addEventListener('change', (e) => {
+        displaySheetData(e.target.value);
+    });
+
+    // Import button
+    importExcelDataBtn.addEventListener('click', importExcelData);
+
+    // Mapping selectors
+    document.getElementById('nameColumnMap').addEventListener('change', updateMapping);
+    document.getElementById('classColumnMap').addEventListener('change', updateMapping);
+}
+
+function resetExcelModal() {
+    excelWorkbook = null;
+    excelData = null;
+    detectedMapping = { nameColumn: null, classColumn: null, scoreColumns: [] };
+    
+    document.getElementById('fileInfo').style.display = 'none';
+    document.getElementById('previewSection').style.display = 'none';
+    document.getElementById('mappingSection').style.display = 'none';
+    document.getElementById('summarySection').style.display = 'none';
+    document.getElementById('importExcelDataBtn').style.display = 'none';
+}
+
+function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) {
+        processExcelFile(file);
+    }
+}
+
+function processExcelFile(file) {
+    console.log('📊 Processing file:', file.name);
+    
+    // Show file info
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent = formatFileSize(file.size);
+    document.getElementById('fileInfo').style.display = 'block';
+
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            excelWorkbook = XLSX.read(data, { type: 'array' });
+            
+            console.log('✅ Workbook loaded:', excelWorkbook.SheetNames);
+            
+            // Populate sheet selector
+            const sheetSelector = document.getElementById('sheetSelector');
+            sheetSelector.innerHTML = '';
+            excelWorkbook.SheetNames.forEach(sheetName => {
+                const option = document.createElement('option');
+                option.value = sheetName;
+                option.textContent = sheetName;
+                sheetSelector.appendChild(option);
+            });
+            
+            // Display first sheet
+            displaySheetData(excelWorkbook.SheetNames[0]);
+            
+        } catch (error) {
+            console.error('❌ Error reading Excel:', error);
+            alert('Lỗi đọc file Excel: ' + error.message);
+        }
+    };
+    
+    reader.readAsArrayBuffer(file);
+}
+
+function displaySheetData(sheetName) {
+    console.log('📋 Displaying sheet:', sheetName);
+    
+    const worksheet = excelWorkbook.Sheets[sheetName];
+    excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    console.log('📊 Data rows:', excelData.length);
+    
+    if (excelData.length === 0) {
+        alert('Sheet trống!');
+        return;
+    }
+    
+    // Show preview
+    displayPreviewTable(excelData);
+    
+    // Auto-detect columns
+    autoDetectColumns(excelData);
+    
+    // Show sections
+    document.getElementById('previewSection').style.display = 'block';
+    document.getElementById('mappingSection').style.display = 'block';
+    document.getElementById('summarySection').style.display = 'block';
+    document.getElementById('importExcelDataBtn').style.display = 'inline-flex';
+}
+
+function displayPreviewTable(data) {
+    const previewTable = document.getElementById('previewTable');
+    
+    if (data.length === 0) return;
+    
+    let html = '<table class="preview-table"><thead><tr>';
+    
+    // Header row
+    const headers = data[0];
+    headers.forEach((header, idx) => {
+        html += `<th>${header || 'Cột ' + (idx + 1)}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    // Data rows (show first 10)
+    const maxRows = Math.min(10, data.length - 1);
+    for (let i = 1; i <= maxRows; i++) {
+        html += '<tr>';
+        data[i].forEach(cell => {
+            html += `<td>${cell !== undefined ? cell : ''}</td>`;
+        });
+        html += '</tr>';
+    }
+    
+    html += '</tbody></table>';
+    
+    if (data.length > 11) {
+        html += `<p style="text-align: center; color: var(--text-secondary); margin-top: 10px;">
+            ... và ${data.length - 11} dòng khác</p>`;
+    }
+    
+    previewTable.innerHTML = html;
+}
+
+function autoDetectColumns(data) {
+    console.log('🔍 Auto-detecting columns...');
+    
+    if (data.length < 2) {
+        console.log('⚠️ Not enough data');
+        return;
+    }
+    
+    const headers = data[0].map((h, i) => ({
+        index: i,
+        name: String(h || `Cột ${i + 1}`).toLowerCase().trim()
+    }));
+    
+    console.log('📌 Headers:', headers);
+    
+    // Detect name column (tên, họ tên, học sinh, name, student)
+    const nameKeywords = ['tên', 'họ tên', 'học sinh', 'name', 'student', 'họ và tên'];
+    detectedMapping.nameColumn = headers.find(h => 
+        nameKeywords.some(kw => h.name.includes(kw))
+    )?.index;
+    
+    // Detect class column (lớp, class)
+    const classKeywords = ['lớp', 'class', 'nhóm', 'group'];
+    detectedMapping.classColumn = headers.find(h => 
+        classKeywords.some(kw => h.name.includes(kw))
+    )?.index;
+    
+    // Detect score columns (điểm, score, test, kiểm tra, đ, numbers)
+    const scoreKeywords = ['điểm', 'score', 'test', 'kiểm tra', 'bài', 'kỳ'];
+    detectedMapping.scoreColumns = headers
+        .filter((h, idx) => {
+            // Check if column name contains score keywords
+            const hasKeyword = scoreKeywords.some(kw => h.name.includes(kw));
+            
+            // Or check if most values in column are numbers
+            const isNumeric = checkIfNumericColumn(data, idx);
+            
+            return hasKeyword || isNumeric;
+        })
+        .filter(h => h.index !== detectedMapping.nameColumn && h.index !== detectedMapping.classColumn)
+        .map(h => h.index);
+    
+    console.log('✅ Detected mapping:', detectedMapping);
+    
+    // Populate mapping selectors
+    populateMappingSelectors(headers);
+    updateSummary(data);
+}
+
+function checkIfNumericColumn(data, colIndex) {
+    if (data.length < 3) return false;
+    
+    let numericCount = 0;
+    const checkRows = Math.min(10, data.length - 1);
+    
+    for (let i = 1; i <= checkRows; i++) {
+        const value = data[i][colIndex];
+        if (value !== undefined && value !== null && value !== '') {
+            const num = parseFloat(String(value).replace(',', '.'));
+            if (!isNaN(num) && num >= 0 && num <= 100) {
+                numericCount++;
+            }
+        }
+    }
+    
+    return numericCount / checkRows > 0.6; // 60% numeric = score column
+}
+
+function populateMappingSelectors(headers) {
+    const nameSelect = document.getElementById('nameColumnMap');
+    const classSelect = document.getElementById('classColumnMap');
+    const scoreColumnsDiv = document.getElementById('scoreColumnsMap');
+    
+    // Populate name selector
+    nameSelect.innerHTML = '';
+    headers.forEach(h => {
+        const option = document.createElement('option');
+        option.value = h.index;
+        option.textContent = excelData[0][h.index] || `Cột ${h.index + 1}`;
+        if (h.index === detectedMapping.nameColumn) {
+            option.selected = true;
+        }
+        nameSelect.appendChild(option);
+    });
+    
+    // Populate class selector
+    classSelect.innerHTML = '<option value="">-- Không có --</option>';
+    headers.forEach(h => {
+        const option = document.createElement('option');
+        option.value = h.index;
+        option.textContent = excelData[0][h.index] || `Cột ${h.index + 1}`;
+        if (h.index === detectedMapping.classColumn) {
+            option.selected = true;
+        }
+        classSelect.appendChild(option);
+    });
+    
+    // Populate score columns checkboxes
+    scoreColumnsDiv.innerHTML = '';
+    headers.forEach(h => {
+        if (h.index !== detectedMapping.nameColumn && h.index !== detectedMapping.classColumn) {
+            const chip = document.createElement('div');
+            chip.className = 'score-column-chip';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = h.index;
+            checkbox.id = `scoreCol_${h.index}`;
+            checkbox.checked = detectedMapping.scoreColumns.includes(h.index);
+            checkbox.addEventListener('change', updateMapping);
+            
+            const label = document.createElement('label');
+            label.htmlFor = `scoreCol_${h.index}`;
+            label.textContent = excelData[0][h.index] || `Cột ${h.index + 1}`;
+            label.style.cursor = 'pointer';
+            
+            chip.appendChild(checkbox);
+            chip.appendChild(label);
+            scoreColumnsDiv.appendChild(chip);
+        }
+    });
+}
+
+function updateMapping() {
+    detectedMapping.nameColumn = parseInt(document.getElementById('nameColumnMap').value);
+    
+    const classValue = document.getElementById('classColumnMap').value;
+    detectedMapping.classColumn = classValue ? parseInt(classValue) : null;
+    
+    detectedMapping.scoreColumns = Array.from(document.querySelectorAll('#scoreColumnsMap input[type="checkbox"]:checked'))
+        .map(cb => parseInt(cb.value));
+    
+    console.log('🔄 Updated mapping:', detectedMapping);
+    updateSummary(excelData);
+}
+
+function updateSummary(data) {
+    const totalStudents = data.length - 1; // Exclude header
+    const totalScores = detectedMapping.scoreColumns.length;
+    
+    // Detect class from data if class column exists
+    let detectedClass = '-';
+    if (detectedMapping.classColumn !== null && data.length > 1) {
+        const classValues = data.slice(1)
+            .map(row => row[detectedMapping.classColumn])
+            .filter(v => v);
+        
+        // Get most common class
+        const classCounts = {};
+        classValues.forEach(c => {
+            classCounts[c] = (classCounts[c] || 0) + 1;
+        });
+        
+        if (Object.keys(classCounts).length > 0) {
+            detectedClass = Object.keys(classCounts).reduce((a, b) => 
+                classCounts[a] > classCounts[b] ? a : b
+            );
+        }
+    }
+    
+    document.getElementById('totalStudents').textContent = totalStudents;
+    document.getElementById('totalScores').textContent = totalScores;
+    document.getElementById('detectedClass').textContent = detectedClass;
+}
+
+function importExcelData() {
+    console.log('📥 Importing Excel data...');
+    
+    if (!excelData || excelData.length < 2) {
+        alert('Không có dữ liệu để import!');
+        return;
+    }
+    
+    if (detectedMapping.nameColumn === null) {
+        alert('Vui lòng chọn cột tên học sinh!');
+        return;
+    }
+    
+    if (detectedMapping.scoreColumns.length === 0) {
+        alert('Vui lòng chọn ít nhất 1 cột điểm!');
+        return;
+    }
+    
+    try {
+        // Build students array - Keep original Excel column names
+        const students = [];
+        const scoreColumnNames = detectedMapping.scoreColumns.map(idx => {
+            const originalName = excelData[0][idx];
+            return originalName ? String(originalName).trim() : `Điểm ${idx + 1}`;
+        });
+        
+        for (let i = 1; i < excelData.length; i++) {
+            const row = excelData[i];
+            const studentName = row[detectedMapping.nameColumn];
+            
+            if (!studentName || String(studentName).trim() === '') continue;
+            
+            const scores = {};
+            detectedMapping.scoreColumns.forEach((colIdx, idx) => {
+                const scoreValue = row[colIdx];
+                const columnName = scoreColumnNames[idx];
+                scores[columnName] = scoreValue !== undefined && scoreValue !== null && scoreValue !== '' 
+                    ? String(scoreValue) 
+                    : '';
+            });
+            
+            students.push({
+                name: String(studentName).trim(),
+                scores: scores
+            });
+        }
+        
+        console.log('✅ Parsed students:', students);
+        
+        // Detect class name
+        let className = '';
+        if (detectedMapping.classColumn !== null && excelData.length > 1) {
+            const classValues = excelData.slice(1)
+                .map(row => row[detectedMapping.classColumn])
+                .filter(v => v);
+            
+            if (classValues.length > 0) {
+                const classCounts = {};
+                classValues.forEach(c => {
+                    classCounts[c] = (classCounts[c] || 0) + 1;
+                });
+                className = Object.keys(classCounts).reduce((a, b) => 
+                    classCounts[a] > classCounts[b] ? a : b
+                );
+            }
+        }
+        
+        // Create new record
+        const sheetName = document.getElementById('sheetSelector').value;
+        const fileName = document.getElementById('fileName').textContent;
+        
+        const newRecord = {
+            id: generateId(),
+            recordName: `${fileName} - ${sheetName}`,
+            recordClass: className || 'Import từ Excel',
+            students: students,
+            scoreColumns: scoreColumnNames,
+            lastModified: new Date().toISOString(),
+            existsInDatabase: false // Mark as new record from Excel import
+        };
+        
+        console.log('📦 New record:', newRecord);
+        
+        // Open detail modal with imported data
+        document.getElementById('excelModal').style.display = 'none';
+        openRecordModal(newRecord);
+        
+        alert(`✅ Import thành công ${students.length} học sinh với ${scoreColumnNames.length} cột điểm!\n\nVui lòng kiểm tra và nhấn "Lưu bản ghi" để lưu vào hệ thống.`);
+        
+    } catch (error) {
+        console.error('❌ Import error:', error);
+        alert('Lỗi khi import dữ liệu: ' + error.message);
+    }
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+// Add Excel import listeners to setup
+const originalSetupEventListeners = setupEventListeners;
+setupEventListeners = function() {
+    originalSetupEventListeners();
+    setupExcelImportListeners();
+};
