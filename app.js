@@ -1,5 +1,10 @@
-// Configuration loaded from config.js
-// const CONFIG = { PROXY_URL: '...' }
+// Configuration - Multiple fallback layers
+// Priority: 1. window.CONFIG (from config.js) -> 2. Hardcoded default
+const CONFIG = window.CONFIG || {
+    PROXY_URL: 'https://proxyscore.mctran2005.workers.dev'
+};
+
+console.log('🚀 App starting with PROXY_URL:', CONFIG.PROXY_URL);
 
 // State management
 let allRecords = [];
