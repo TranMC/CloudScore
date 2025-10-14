@@ -1,204 +1,129 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Quản lý điểm – jQuery + Google Sheets</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <style>
-    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;padding:24px;background:#0b1220;color:#e7ecf3}
-    h1{font-size:22px;margin:0 0 16px}
-    .card{background:#121a2b;border:1px solid #1f2940;border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
-    label{display:block;margin-bottom:6px;color:#8fb3ff}
-    input,select{width:100%;padding:10px;border-radius:10px;border:1px solid #2a3552;background:#0e1730;color:#e7ecf3}
-    table{width:100%;border-collapse:separate;border-spacing:0 10px}
-    th,td{padding:12px 10px}
-    th{color:#8fb3ff;text-align:left;border-bottom:1px solid #243156}
-    tr{background:#0e1730;border:1px solid #1d2a4a}
-    tr:hover{background:#122043}
-    .row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-    .btn{padding:10px 14px;border-radius:10px;border:1px solid #2a3552;background:#1a2747;color:#e7ecf3;cursor:pointer}
-    .btn.primary{background:#2e5cff;border-color:#2e5cff}
-    .btn.danger{background:#b91c1c;border-color:#b91c1c}
-    .toolbar{display:flex;gap:8px;margin-bottom:12px}
-    .muted{opacity:.75;font-size:12px}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudScore - Quản lý điểm học sinh</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="config.js"></script>
 </head>
 <body>
-  <h1>Quản lý điểm – 3 tác vụ: Thêm / Sửa / Xoá</h1>
+    <div class="container">
+        <header>
+            <h1>CloudScore - Hệ thống quản lý điểm</h1>
+            <button id="addRecordBtn" class="btn-primary">+ Thêm bản ghi mới</button>
+        </header>
 
-  <div class="card">
-    <div class="toolbar">
-      <input id="search" placeholder="Tìm theo tên / lớp / mã HS..." />
-      <button id="btnReload" class="btn">Tải lại</button>
+        <div id="searchBar">
+            <input type="text" id="searchInput" placeholder="Tìm kiếm theo tên, lớp...">
+            <button id="refreshBtn" class="btn-secondary">🔄 Làm mới</button>
+        </div>
+
+        <div id="cardsContainer" class="cards-grid">
+            <!-- Cards sẽ được tạo động bằng JavaScript -->
+            <div class="loading">Đang tải dữ liệu...</div>
+        </div>
     </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Lớp</th>
-          <th>Mã HS</th>
-          <th>Họ tên</th>
-          <th>Giữa kỳ</th>
-          <th>Cuối kỳ</th>
-          <th>TB</th>
-          <th>Cập nhật</th>
-          <th>Hành động</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-    <div class="muted" id="status"></div>
-  </div>
+    <!-- Modal chi tiết nhóm -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content modal-large">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">Chi tiết bản ghi</h2>
+            
+            <div class="detail-section">
+                <div class="info-group">
+                    <label>Tên bản ghi:</label>
+                    <input type="text" id="recordName" placeholder="VD: 6A8 - Bản ghi 10/10/2025">
+                </div>
+                
+                <div class="info-group">
+                    <label>Lớp:</label>
+                    <input type="text" id="recordClass" placeholder="Nhập lớp (VD: 6A8)">
+                </div>
+            </div>
 
-  <div class="card">
-    <h2 style="margin:0 0 10px;font-size:18px">Thêm / Cập nhật</h2>
-    <div class="row">
-      <div>
-        <label>Lớp</label>
-        <input id="class" />
-      </div>
-      <div>
-        <label>Mã HS</label>
-        <input id="student_id" />
-      </div>
-      <div>
-        <label>Họ tên</label>
-        <input id="name" />
-      </div>
-      <div>
-        <label>Điểm GK</label>
-        <input id="midterm" type="number" step="0.01" />
-      </div>
-      <div>
-        <label>Điểm CK</label>
-        <input id="final" type="number" step="0.01" />
-      </div>
-      <div>
-        <label>ID (để sửa mục đã có)</label>
-        <input id="id" placeholder="Để trống nếu thêm mới" />
-      </div>
+            <div class="scores-section">
+                <div class="section-header">
+                    <h3>Danh sách học sinh</h3>
+                    <div>
+                        <button id="addColumnBtn" class="btn-small">+ Thêm cột điểm</button>
+                        <button id="addStudentBtn" class="btn-small">+ Thêm học sinh</button>
+                        <button id="batchImportBtn" class="btn-small">📥 Import hàng loạt</button>
+                    </div>
+                </div>
+                
+                <div id="studentsTable">
+                    <!-- Bảng học sinh sẽ được tạo ở đây -->
+                </div>
+            </div>
+
+            <div class="metadata-section">
+                <p><strong>Ngày tạo/sửa:</strong> <span id="lastModified"></span></p>
+                <p><strong>Số học sinh:</strong> <span id="studentCount">0</span></p>
+            </div>
+
+            <div class="modal-actions">
+                <button id="saveBtn" class="btn-primary">💾 Lưu bản ghi</button>
+                <button id="deleteBtn" class="btn-danger">🗑️ Xóa bản ghi</button>
+                <button id="cancelBtn" class="btn-secondary">Đóng</button>
+            </div>
+        </div>
     </div>
-    <div class="toolbar" style="margin-top:12px">
-      <button id="btnSave" class="btn primary">Lưu</button>
-      <button id="btnClear" class="btn">Clear form</button>
+
+    <!-- Modal thêm/sửa học sinh -->
+    <div id="studentModal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="close">&times;</span>
+            <h3 id="studentModalTitle">Thêm học sinh</h3>
+            <div class="info-group">
+                <label>Họ và tên:</label>
+                <input type="text" id="studentName" placeholder="Nhập tên học sinh">
+            </div>
+            <div id="studentScores">
+                <!-- Các ô điểm sẽ được tạo động -->
+            </div>
+            <div class="modal-actions">
+                <button id="saveStudentBtn" class="btn-primary">Lưu</button>
+                <button id="cancelStudentBtn" class="btn-secondary">Hủy</button>
+            </div>
+        </div>
     </div>
-  </div>
 
-<script>
-  // ========== CẤU HÌNH ==========
-  const API = {
-    // Apps Script Web App URL (đích GET bằng JSONP)
-    url: 'https://script.google.com/macros/s/AKfycbxp3lai5nreElmbAGS4IhrkJNbcamMdALJkLRBBkdess9v37udR6mKsXRBJlbtD1Vfoew/exec',
-    key: 'yourmamaisgei'
-  };
-  // Cloudflare Worker (đích POST để bypass CORS)
-  const PROXY_URL = 'https://proxyscore.mctran2005.workers.dev/'; // <-- điền URL Worker
+    <!-- Modal import batch -->
+    <div id="batchModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Import danh sách học sinh</h3>
+            <p>Nhập danh sách theo format: <code>Tên, Điểm1, Điểm2, ...</code></p>
+            <p><small>Mỗi học sinh một dòng. VD: <code>Nguyễn Văn A, 8.5, 9.0</code></small></p>
+            <div class="info-group">
+                <label>Dữ liệu:</label>
+                <textarea id="batchData" rows="10" placeholder="Nguyễn Văn A, 8.5, 9.0&#10;Trần Thị B, 7.5, 8.0&#10;Lê Văn C, 9.0, 9.5"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button id="processBatchBtn" class="btn-primary">Import</button>
+                <button id="cancelBatchBtn" class="btn-secondary">Hủy</button>
+            </div>
+        </div>
+    </div>
 
-  function fmt(n){ return Number(n||0).toFixed(2); }
+    <!-- Modal thêm cột điểm -->
+    <div id="columnModal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="close">&times;</span>
+            <h3>Thêm cột điểm mới</h3>
+            <div class="info-group">
+                <label>Tên cột:</label>
+                <input type="text" id="newColumnName" placeholder="VD: Điểm giữa kỳ, Điểm cuối kỳ...">
+            </div>
+            <div class="modal-actions">
+                <button id="confirmAddColumn" class="btn-primary">Thêm</button>
+                <button id="cancelAddColumn" class="btn-secondary">Hủy</button>
+            </div>
+        </div>
+    </div>
 
-  // === GET bằng JSONP (không CORS) ===
-  function load(q=''){
-    $('#status').text('Đang tải...');
-    $.ajax({
-      url: API.url,
-      data: { key: API.key, q },            // KHÔNG cần origin
-      dataType: 'jsonp',                    // 👈 bật JSONP
-      jsonp: 'callback'                     // 👈 Apps Script nhận param "callback"
-    }).done(res => {
-      if (!res.ok){ $('#status').text(res.error||'Lỗi'); return; }
-      const rows = res.data || [];
-      const $tb = $('#tbody').empty();
-      rows.forEach(r => {
-        const tr = $(`
-          <tr>
-            <td>${r.class||''}</td>
-            <td>${r.student_id||''}</td>
-            <td>${r.name||''}</td>
-            <td>${fmt(r.midterm)}</td>
-            <td>${fmt(r.final)}</td>
-            <td>${fmt(r.average)}</td>
-            <td>${r.updated_at||''}</td>
-            <td>
-              <button class="btn" data-act="edit" data-id="${r.id}">Sửa</button>
-              <button class="btn danger" data-act="del" data-id="${r.id}">Xoá</button>
-            </td>
-          </tr>`);
-        $tb.append(tr);
-      });
-      $('#status').text(`${rows.length} bản ghi`);
-    }).fail(()=> $('#status').text('Không truy cập được API'));
-  }
-
-  // === POST qua PROXY (bypass CORS) ===
-  function save(){
-    const id = $('#id').val().trim();
-    const record = {
-      class: $('#class').val().trim(),
-      student_id: $('#student_id').val().trim(),
-      name: $('#name').val().trim(),
-      midterm: $('#midterm').val(),
-      final: $('#final').val()
-    };
-
-    const body = { key: API.key };
-    if (id) { body.action='update'; body.id=id; body.record=record; }
-    else    { body.action='create'; body.record=record; }
-
-    $.ajax({
-      url: PROXY_URL,                        // 👈 gọi qua proxy
-      method: 'POST',
-      data: JSON.stringify(body),
-      contentType: 'application/json'
-    })
-    .done(res => {
-      if (res.ok){ load($('#search').val()); clearForm(); }
-      else alert(res.error||'Lỗi');
-    })
-    .fail(()=> alert('Không truy cập được PROXY'));
-  }
-
-  function del(id){
-    const body = { key: API.key, action:'delete', id };
-
-    $.ajax({
-      url: PROXY_URL,                        // 👈 gọi qua proxy
-      method: 'POST',
-      data: JSON.stringify(body),
-      contentType: 'application/json'
-    })
-    .done(res => { if (res.ok){ load($('#search').val()); } else alert(res.error||'Lỗi'); })
-    .fail(()=> alert('Không truy cập được PROXY'));
-  }
-
-  function clearForm(){ $('input').val(''); }
-
-  // Events
-  $(document).on('click','[data-act="edit"]',function(){
-    const tr = $(this).closest('tr');
-    $('#class').val(tr.children().eq(0).text());
-    $('#student_id').val(tr.children().eq(1).text());
-    $('#name').val(tr.children().eq(2).text());
-    $('#midterm').val(tr.children().eq(3).text());
-    $('#final').val(tr.children().eq(4).text());
-    $('#id').val($(this).data('id'));
-    window.scrollTo({top:0, behavior:'smooth'});
-  });
-
-  $(document).on('click','[data-act="del"]',function(){
-    if (confirm('Xoá bản ghi này?')) del($(this).data('id'));
-  });
-
-  $('#btnReload').on('click', ()=> load($('#search').val()));
-  $('#btnSave').on('click', save);
-  $('#btnClear').on('click', clearForm);
-  $('#search').on('input', function(){ load($(this).val()); });
-
-  // Init
-  load();
-</script>
+    <script src="app.js"></script>
 </body>
 </html>
