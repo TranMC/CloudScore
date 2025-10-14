@@ -8,15 +8,67 @@ let currentStudent = null;
 let isEditMode = false;
 let scoreColumns = ['Điểm giữa kỳ', 'Điểm cuối kỳ']; // Default columns
 
-// DOM Elements
-const cardsContainer = document.getElementById('cardsContainer');
-const detailModal = document.getElementById('detailModal');
-const studentModal = document.getElementById('studentModal');
-const batchModal = document.getElementById('batchModal');
-const searchInput = document.getElementById('searchInput');
+// DOM Elements - will be initialized after DOM loads
+let cardsContainer, detailModal, studentModal, batchModal, searchInput;
+let errorPopup, errorPopupMsg, errorPopupIcon, errorPopupClose, loadingPopup, loadingPopupMsg;
+
+// Popup functions
+function showErrorPopup(msg, isSuccess = false) {
+    if (errorPopupMsg && errorPopup && errorPopupIcon) {
+        errorPopupMsg.textContent = msg;
+        if (isSuccess) {
+            errorPopupIcon.textContent = '✅';
+            errorPopupIcon.style.color = 'var(--secondary-color)';
+            // Auto hide after 2 seconds for success messages
+            setTimeout(() => {
+                hideErrorPopup();
+            }, 2000);
+        } else {
+            errorPopupIcon.textContent = '❌';
+            errorPopupIcon.style.color = 'var(--danger-color)';
+        }
+        errorPopup.classList.add('active');
+    }
+}
+function hideErrorPopup() {
+    if (errorPopup) {
+        errorPopup.classList.remove('active');
+    }
+}
+function showLoadingPopup(msg) {
+    if (loadingPopupMsg && loadingPopup) {
+        loadingPopupMsg.textContent = msg || 'Đang xử lý...';
+        loadingPopup.classList.add('active');
+    }
+}
+function hideLoadingPopup() {
+    if (loadingPopup) {
+        loadingPopup.classList.remove('active');
+    }
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize DOM elements
+    cardsContainer = document.getElementById('cardsContainer');
+    detailModal = document.getElementById('detailModal');
+    studentModal = document.getElementById('studentModal');
+    batchModal = document.getElementById('batchModal');
+    searchInput = document.getElementById('searchInput');
+    
+    // Initialize popup elements
+    errorPopup = document.getElementById('errorPopup');
+    errorPopupMsg = document.getElementById('errorPopupMsg');
+    errorPopupIcon = document.getElementById('errorPopupIcon');
+    errorPopupClose = document.getElementById('errorPopupClose');
+    loadingPopup = document.getElementById('loadingPopup');
+    loadingPopupMsg = document.getElementById('loadingPopupMsg');
+    
+    // Setup popup close button
+    if (errorPopupClose) {
+        errorPopupClose.onclick = hideErrorPopup;
+    }
+    
     setupEventListeners();
     loadRecords();
 });
@@ -448,9 +500,11 @@ async function saveRecord() {
         // Validate
         const recordName = document.getElementById('recordName').value.trim();
         if (!recordName) {
-            alert('Vui lòng nhập tên bản ghi');
+            showErrorPopup('Vui lòng nhập tên bản ghi');
             return;
         }
+
+        showLoadingPopup('Đang lưu bản ghi...');
 
         // Update current record
         currentRecord.recordName = recordName;
@@ -478,7 +532,9 @@ async function saveRecord() {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('❌ Save error:', errorText);
-            throw new Error('Không thể lưu dữ liệu');
+            hideLoadingPopup();
+            showErrorPopup('Không thể lưu dữ liệu');
+            return;
         }
 
         console.log('✅ Save successful!');
@@ -486,36 +542,37 @@ async function saveRecord() {
         // Reload records
         await loadRecords();
         detailModal.style.display = 'none';
-        
-        alert('Lưu thành công!');
+        hideLoadingPopup();
+        showErrorPopup('Lưu thành công!', true);
     } catch (error) {
         console.error('❌ Error saving record:', error);
-        alert('Lỗi: ' + error.message);
+        hideLoadingPopup();
+        showErrorPopup('Lỗi: ' + error.message);
     }
 }
 
 // Delete record
 async function deleteRecord() {
-    if (!confirm('Bạn có chắc muốn xóa bản ghi này? Tất cả học sinh trong bản ghi sẽ bị xóa.')) {
-        return;
-    }
-
+    showLoadingPopup('Đang xóa bản ghi...');
     try {
         const response = await fetch(`${CONFIG.PROXY_URL}/records/${currentRecord.id}`, {
             method: 'DELETE'
         });
 
         if (!response.ok) {
-            throw new Error('Không thể xóa dữ liệu');
+            hideLoadingPopup();
+            showErrorPopup('Không thể xóa dữ liệu');
+            return;
         }
 
         await loadRecords();
         detailModal.style.display = 'none';
-        
-        alert('Xóa thành công!');
+        hideLoadingPopup();
+        showErrorPopup('Xóa thành công!', true);
     } catch (error) {
         console.error('Error deleting record:', error);
-        alert('Lỗi: ' + error.message);
+        hideLoadingPopup();
+        showErrorPopup('Lỗi: ' + error.message);
     }
 }
 

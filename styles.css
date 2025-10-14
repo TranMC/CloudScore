@@ -31,6 +31,49 @@ body {
     min-height: 100vh;
 }
 
+.popup-modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.25);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+.popup-modal.active {
+    display: flex;
+}
+.popup-content {
+    background: var(--card-background);
+    border-radius: 16px;
+    box-shadow: var(--shadow-xl);
+    padding: 32px 40px;
+    min-width: 320px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    font-size: 1.15rem;
+    animation: popupFadeIn 0.3s;
+}
+#errorPopupIcon {
+    font-size: 2.5rem;
+    color: var(--danger-color);
+}
+#loadingPopupIcon {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    animation: loadingSpin 1.2s linear infinite;
+}
+@keyframes loadingSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+@keyframes popupFadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
 .container {
     max-width: 1200px;
     margin: 0 auto;
