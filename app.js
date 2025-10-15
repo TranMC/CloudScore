@@ -1,8 +1,8 @@
 // Configuration - Multiple fallback layers
 // Priority: 1. window.CONFIG (from config.js) -> 2. Hardcoded default
-const CONFIG = window.CONFIG || {
-    PROXY_URL: 'https://proxyscore.mctran2005.workers.dev'
-};
+// const CONFIG = window.CONFIG || {
+//     PROXY_URL: 'https://proxyscore.mctran2005.workers.dev'
+// };
 
 console.log('🚀 App starting with PROXY_URL:', CONFIG.PROXY_URL);
 
@@ -16,6 +16,8 @@ let scoreColumns = ['Điểm giữa kỳ', 'Điểm cuối kỳ']; // Default co
 // DOM Elements - will be initialized after DOM loads
 let cardsContainer, detailModal, studentModal, batchModal, searchInput;
 let errorPopup, errorPopupMsg, errorPopupIcon, errorPopupClose, loadingPopup, loadingPopupMsg;
+let confirmPopup, confirmPopupMsg, confirmPopupYes, confirmPopupNo;
+let confirmCallback = null;
 
 // Popup functions
 function showErrorPopup(msg, isSuccess = false) {
@@ -52,6 +54,24 @@ function hideLoadingPopup() {
     }
 }
 
+// Confirm popup with Promise
+function showConfirmPopup(msg) {
+    return new Promise((resolve) => {
+        if (confirmPopupMsg && confirmPopup) {
+            confirmPopupMsg.textContent = msg;
+            confirmPopup.classList.add('active');
+            
+            confirmCallback = (result) => {
+                confirmPopup.classList.remove('active');
+                resolve(result);
+            };
+        } else {
+            // Fallback to native confirm if popup not available
+            resolve(confirm(msg));
+        }
+    });
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize DOM elements
@@ -68,10 +88,26 @@ document.addEventListener('DOMContentLoaded', () => {
     errorPopupClose = document.getElementById('errorPopupClose');
     loadingPopup = document.getElementById('loadingPopup');
     loadingPopupMsg = document.getElementById('loadingPopupMsg');
+    confirmPopup = document.getElementById('confirmPopup');
+    confirmPopupMsg = document.getElementById('confirmPopupMsg');
+    confirmPopupYes = document.getElementById('confirmPopupYes');
+    confirmPopupNo = document.getElementById('confirmPopupNo');
     
     // Setup popup close button
     if (errorPopupClose) {
         errorPopupClose.onclick = hideErrorPopup;
+    }
+    
+    // Setup confirm buttons
+    if (confirmPopupYes) {
+        confirmPopupYes.onclick = () => {
+            if (confirmCallback) confirmCallback(true);
+        };
+    }
+    if (confirmPopupNo) {
+        confirmPopupNo.onclick = () => {
+            if (confirmCallback) confirmCallback(false);
+        };
     }
     
     setupEventListeners();
@@ -143,9 +179,16 @@ function setupEventListeners() {
 // Load records from backend via proxy
 async function loadRecords() {
     try {
-        cardsContainer.innerHTML = '<div class="loading">Đang tải dữ liệu...</div>';
+        cardsContainer.innerHTML = `
+            <div class="initial-loading">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Đang tải dữ liệu...</div>
+                <div class="loading-subtext">Vui lòng đợi trong giây lát</div>
+            </div>
+        `;
         
         console.log('🔍 Fetching from:', `${CONFIG.PROXY_URL}/records`);
+
         const response = await fetch(`${CONFIG.PROXY_URL}/records`);
         
         console.log('📡 Response status:', response.status, response.statusText);
@@ -170,9 +213,14 @@ async function loadRecords() {
     } catch (error) {
         console.error('❌ Error loading records:', error);
         cardsContainer.innerHTML = `
-            <div class="error-message">
-                <strong>Lỗi:</strong> ${error.message}
-                <br><small>Vui lòng kiểm tra cấu hình và thử lại.</small>
+            <div class="error-state">
+                <div class="error-icon">⚠️</div>
+                <div class="error-title">Không thể tải dữ liệu</div>
+                <div class="error-message">${error.message}</div>
+                <div class="error-actions">
+                    <button onclick="loadRecords()" class="btn-primary">🔄 Thử lại</button>
+                    <a href="config-test.html" target="_blank" class="btn-secondary">🔧 Kiểm tra cấu hình</a>
+                </div>
             </div>
         `;
     }
@@ -185,8 +233,17 @@ function displayCards(records) {
     if (!records || records.length === 0) {
         cardsContainer.innerHTML = `
             <div class="empty-state">
-                <h3>Chưa có dữ liệu</h3>
-                <p>Nhấn "Thêm bản ghi mới" để bắt đầu</p>
+                <div class="empty-icon">📋</div>
+                <div class="empty-title">Chưa có bản ghi nào</div>
+                <div class="empty-message">Bắt đầu bằng cách thêm bản ghi mới hoặc import từ Excel</div>
+                <div class="empty-actions">
+                    <button onclick="document.getElementById('addRecordBtn').click()" class="btn-primary">
+                        ➕ Thêm bản ghi mới
+                    </button>
+                    <button onclick="document.getElementById('importExcelBtn').click()" class="btn-secondary">
+                        📊 Import Excel
+                    </button>
+                </div>
             </div>
         `;
         return;
@@ -360,7 +417,7 @@ function addScoreColumn() {
 
     const trimmedName = columnName.trim();
     if (scoreColumns.includes(trimmedName)) {
-        alert('Cột này đã tồn tại!');
+        showErrorPopup('Cột này đã tồn tại!');
         return;
     }
 
@@ -370,8 +427,9 @@ function addScoreColumn() {
 }
 
 // Remove score column
-function removeScoreColumn(columnName) {
-    if (!confirm(`Xóa cột "${columnName}"?`)) return;
+async function removeScoreColumn(columnName) {
+    const confirmed = await showConfirmPopup(`Xóa cột "${columnName}"?`);
+    if (!confirmed) return;
 
     scoreColumns = scoreColumns.filter(col => col !== columnName);
     currentRecord.scoreColumns = scoreColumns;
@@ -425,7 +483,7 @@ function openStudentModal(studentIndex) {
 function saveStudent() {
     const name = document.getElementById('studentName').value.trim();
     if (!name) {
-        alert('Vui lòng nhập tên học sinh');
+        showErrorPopup('Vui lòng nhập tên học sinh');
         return;
     }
 
@@ -453,8 +511,9 @@ function saveStudent() {
 }
 
 // Delete student
-function deleteStudent(index) {
-    if (!confirm('Xóa học sinh này?')) return;
+async function deleteStudent(index) {
+    const confirmed = await showConfirmPopup('Xóa học sinh này?');
+    if (!confirmed) return;
 
     currentRecord.students.splice(index, 1);
     document.getElementById('studentCount').textContent = currentRecord.students.length;
@@ -465,7 +524,7 @@ function deleteStudent(index) {
 function processBatchImport() {
     const data = document.getElementById('batchData').value.trim();
     if (!data) {
-        alert('Vui lòng nhập dữ liệu');
+        showErrorPopup('Vui lòng nhập dữ liệu');
         return;
     }
 
@@ -492,7 +551,7 @@ function processBatchImport() {
         imported++;
     });
 
-    alert(`Đã import ${imported} học sinh`);
+    showErrorPopup(`Đã import ${imported} học sinh`, true);
     document.getElementById('batchData').value = '';
     document.getElementById('studentCount').textContent = currentRecord.students.length;
     renderStudentsTable();
@@ -712,7 +771,7 @@ function processExcelFile(file) {
             
         } catch (error) {
             console.error('❌ Error reading Excel:', error);
-            alert('Lỗi đọc file Excel: ' + error.message);
+            showErrorPopup('Lỗi đọc file Excel: ' + error.message);
         }
     };
     
@@ -728,7 +787,7 @@ function displaySheetData(sheetName) {
     console.log('📊 Data rows:', excelData.length);
     
     if (excelData.length === 0) {
-        alert('Sheet trống!');
+        showErrorPopup('Sheet trống!');
         return;
     }
     
@@ -948,17 +1007,17 @@ function importExcelData() {
     console.log('📥 Importing Excel data...');
     
     if (!excelData || excelData.length < 2) {
-        alert('Không có dữ liệu để import!');
+        showErrorPopup('Không có dữ liệu để import!');
         return;
     }
     
     if (detectedMapping.nameColumn === null) {
-        alert('Vui lòng chọn cột tên học sinh!');
+        showErrorPopup('Vui lòng chọn cột tên học sinh!');
         return;
     }
     
     if (detectedMapping.scoreColumns.length === 0) {
-        alert('Vui lòng chọn ít nhất 1 cột điểm!');
+        showErrorPopup('Vui lòng chọn ít nhất 1 cột điểm!');
         return;
     }
     
@@ -1031,11 +1090,11 @@ function importExcelData() {
         document.getElementById('excelModal').style.display = 'none';
         openRecordModal(newRecord);
         
-        alert(`✅ Import thành công ${students.length} học sinh với ${scoreColumnNames.length} cột điểm!\n\nVui lòng kiểm tra và nhấn "Lưu bản ghi" để lưu vào hệ thống.`);
+        showErrorPopup(`✅ Import thành công ${students.length} học sinh với ${scoreColumnNames.length} cột điểm!\n\nVui lòng kiểm tra và nhấn "Lưu bản ghi" để lưu vào hệ thống.`, true);
         
     } catch (error) {
         console.error('❌ Import error:', error);
-        alert('Lỗi khi import dữ liệu: ' + error.message);
+        showErrorPopup('Lỗi khi import dữ liệu: ' + error.message);
     }
 }
 

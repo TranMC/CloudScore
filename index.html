@@ -30,7 +30,11 @@
 
         <div id="cardsContainer" class="cards-grid">
             <!-- Cards sẽ được tạo động bằng JavaScript -->
-            <div class="loading">Đang tải dữ liệu...</div>
+            <div class="initial-loading">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Đang tải dữ liệu...</div>
+                <div class="loading-subtext">Vui lòng đợi trong giây lát</div>
+            </div>
         </div>
     </div>
 
@@ -390,6 +394,18 @@
         <div class="popup-content">
             <span id="loadingPopupIcon">⏳</span>
             <span id="loadingPopupMsg">Đang xử lý...</span>
+        </div>
+    </div>
+
+    <!-- Popup confirm -->
+    <div id="confirmPopup" class="popup-modal">
+        <div class="popup-content">
+            <span id="confirmPopupIcon">❓</span>
+            <span id="confirmPopupMsg"></span>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="confirmPopupYes" class="btn-primary">Đồng ý</button>
+                <button id="confirmPopupNo" class="btn-secondary">Hủy</button>
+            </div>
         </div>
     </div>
 

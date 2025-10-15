@@ -65,6 +65,10 @@ body {
     color: var(--primary-color);
     animation: loadingSpin 1.2s linear infinite;
 }
+#confirmPopupIcon {
+    font-size: 2.5rem;
+    color: #f59e0b;
+}
 @keyframes loadingSpin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -688,7 +692,7 @@ header h1 {
     z-index: 1;
 }
 
-/* Loading */
+/* Loading - Old style (keep for compatibility) */
 .loading {
     text-align: center;
     padding: 60px;
@@ -707,6 +711,55 @@ header h1 {
     border-top-color: var(--primary-color);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+}
+
+/* Initial Loading - New beautiful style */
+.initial-loading {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    min-height: 400px;
+    gap: 24px;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.loading-spinner {
+    width: 80px;
+    height: 80px;
+    border: 6px solid rgba(255, 255, 255, 0.2);
+    border-top-color: var(--primary-color);
+    border-right-color: var(--secondary-color);
+    border-radius: 50%;
+    animation: spin 1s ease-in-out infinite;
+    box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+}
+
+.loading-text {
+    font-size: 24px;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    letter-spacing: 0.5px;
+}
+
+.loading-subtext {
+    font-size: 16px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.8);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
 }
 
 @keyframes spin {
@@ -838,29 +891,47 @@ header h1 {
     border-radius: 4px;
 }
 
-/* Empty state */
+/* Empty state - New beautiful design */
 .empty-state {
-    text-align: center;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     padding: 80px 20px;
-    color: var(--text-secondary);
+    min-height: 400px;
+    gap: 20px;
+    animation: fadeIn 0.5s ease-in;
 }
 
-.empty-state h3 {
-    margin-bottom: 15px;
-    font-size: 24px;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-.empty-state::before {
-    content: '📚';
-    display: block;
+.empty-icon {
     font-size: 80px;
-    margin-bottom: 20px;
     animation: float 3s ease-in-out infinite;
+    filter: drop-shadow(0 4px 12px rgba(99, 102, 241, 0.3));
+}
+
+.empty-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    margin-top: 10px;
+}
+
+.empty-message {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.8);
+    max-width: 500px;
+    text-align: center;
+    line-height: 1.6;
+}
+
+.empty-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 @keyframes float {
@@ -868,7 +939,57 @@ header h1 {
     50% { transform: translateY(-20px); }
 }
 
-/* Error state */
+/* Error state - New beautiful design */
+.error-state {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    min-height: 400px;
+    gap: 20px;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.error-icon {
+    font-size: 80px;
+    animation: shake 0.5s ease-in-out;
+    filter: drop-shadow(0 4px 12px rgba(239, 68, 68, 0.3));
+}
+
+.error-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.error-state .error-message {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.8);
+    text-align: center;
+    background: rgba(239, 68, 68, 0.15);
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.error-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+/* Old error message style (keep for compatibility) */
 .error-message {
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.1));
     color: var(--danger-color);
