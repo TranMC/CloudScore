@@ -148,6 +148,8 @@ function setupEventListeners() {
     // Record modal buttons
     document.getElementById('saveBtn').addEventListener('click', saveRecord);
     document.getElementById('deleteBtn').addEventListener('click', deleteRecord);
+    document.getElementById('exportExcelBtn').addEventListener('click', exportToExcel);
+    document.getElementById('exportPdfBtn').addEventListener('click', exportToPdf);
     document.getElementById('cancelBtn').addEventListener('click', () => {
         detailModal.style.display = 'none';
     });
@@ -1120,3 +1122,208 @@ setupEventListeners = function() {
     originalSetupEventListeners();
     setupExcelImportListeners();
 };
+
+// ============================================
+// EXPORT FUNCTIONALITY
+// ============================================
+
+// Export to Excel
+function exportToExcel() {
+    if (!currentRecord || !currentRecord.students || currentRecord.students.length === 0) {
+        showErrorPopup('Không có dữ liệu để export!');
+        return;
+    }
+    
+    try {
+        showLoadingPopup('Đang tạo file Excel...');
+        
+        // Prepare data for export
+        const headers = ['STT', 'Họ và tên', ...scoreColumns];
+        const data = [headers];
+        
+        currentRecord.students.forEach((student, index) => {
+            const row = [
+                index + 1,
+                student.name,
+                ...scoreColumns.map(col => student.scores[col] || '')
+            ];
+            data.push(row);
+        });
+        
+        // Create worksheet
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        
+        // Set column widths
+        const colWidths = [
+            { wch: 5 },  // STT
+            { wch: 25 }, // Họ và tên
+            ...scoreColumns.map(() => ({ wch: 12 })) // Score columns
+        ];
+        ws['!cols'] = colWidths;
+        
+        // Create workbook
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Điểm học sinh');
+        
+        // Generate filename
+        const fileName = `${currentRecord.recordName || 'BangDiem'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        // Download
+        XLSX.writeFile(wb, fileName);
+        
+        hideLoadingPopup();
+        showErrorPopup('✅ Export Excel thành công!', true);
+        
+    } catch (error) {
+        console.error('❌ Export Excel error:', error);
+        hideLoadingPopup();
+        showErrorPopup('Lỗi khi export Excel: ' + error.message);
+    }
+}
+
+// Export to PDF
+function exportToPdf() {
+    if (!currentRecord || !currentRecord.students || currentRecord.students.length === 0) {
+        showErrorPopup('Không có dữ liệu để export!');
+        return;
+    }
+    
+    try {
+        showLoadingPopup('Đang tạo file PDF...');
+        
+        // Create a new window for printing
+        const printWindow = window.open('', '_blank');
+        
+        // Build HTML content
+        let htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>${currentRecord.recordName || 'Bảng điểm'}</title>
+                <style>
+                    @page { size: A4 landscape; margin: 15mm; }
+                    body {
+                        font-family: 'Times New Roman', serif;
+                        margin: 0;
+                        padding: 20px;
+                        font-size: 13px;
+                    }
+                    .header {
+                        text-align: center;
+                        margin-bottom: 25px;
+                    }
+                    .header h1 {
+                        font-size: 20px;
+                        margin: 5px 0;
+                        text-transform: uppercase;
+                        font-weight: bold;
+                    }
+                    .header .subtitle {
+                        font-size: 14px;
+                        margin: 5px 0;
+                        font-style: italic;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 20px 0;
+                    }
+                    th, td {
+                        border: 1px solid #333;
+                        padding: 8px;
+                        text-align: center;
+                    }
+                    th {
+                        background-color: #f0f0f0;
+                        font-weight: bold;
+                        font-size: 13px;
+                    }
+                    td:nth-child(2) {
+                        text-align: left;
+                        padding-left: 12px;
+                    }
+                    .footer {
+                        margin-top: 30px;
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 13px;
+                    }
+                    .signature {
+                        text-align: center;
+                        width: 200px;
+                    }
+                    .signature .title {
+                        font-weight: bold;
+                        margin-bottom: 60px;
+                    }
+                    @media print {
+                        button { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>Bảng điểm học sinh</h1>
+                    <div class="subtitle">${currentRecord.recordName || ''}</div>
+                    <div class="subtitle">Lớp: ${currentRecord.recordClass || ''}</div>
+                    <div class="subtitle">Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}</div>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">STT</th>
+                            <th style="width: 200px;">Họ và tên</th>
+                            ${scoreColumns.map(col => `<th>${col}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${currentRecord.students.map((student, index) => `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td>${student.name}</td>
+                                ${scoreColumns.map(col => `<td>${student.scores[col] || ''}</td>`).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                
+                <div class="footer">
+                    <div class="signature">
+                        <div class="title">Giáo viên chủ nhiệm</div>
+                        <div>(Ký và ghi rõ họ tên)</div>
+                    </div>
+                    <div class="signature">
+                        <div class="title">Hiệu trưởng</div>
+                        <div>(Ký và đóng dấu)</div>
+                    </div>
+                </div>
+                
+                <script>
+                    window.onload = function() {
+                        setTimeout(() => {
+                            window.print();
+                        }, 500);
+                    };
+                    
+                    window.onafterprint = function() {
+                        window.close();
+                    };
+                </script>
+            </body>
+            </html>
+        `;
+        
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        
+        hideLoadingPopup();
+        showErrorPopup('✅ Đang mở cửa sổ in PDF...', true);
+        
+    } catch (error) {
+        console.error('❌ Export PDF error:', error);
+        hideLoadingPopup();
+        showErrorPopup('Lỗi khi export PDF: ' + error.message);
+    }
+}
