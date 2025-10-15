@@ -1,6 +1,7 @@
-// Configuration - Multiple fallback layers
-// Priority: 1. window.CONFIG (from config.js) -> 2. Hardcoded default
-const CONFIG = window.CONFIG || {
+// ============================================
+// CONFIGURATION - Centralized in app.js
+// ============================================
+const CONFIG = {
     PROXY_URL: 'https://proxyscore.mctran2005.workers.dev'
 };
 
