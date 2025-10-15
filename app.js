@@ -1,8 +1,8 @@
 // Configuration - Multiple fallback layers
 // Priority: 1. window.CONFIG (from config.js) -> 2. Hardcoded default
-// const CONFIG = window.CONFIG || {
-//     PROXY_URL: 'https://proxyscore.mctran2005.workers.dev'
-// };
+const CONFIG = window.CONFIG || {
+    PROXY_URL: 'https://proxyscore.mctran2005.workers.dev'
+};
 
 console.log('🚀 App starting with PROXY_URL:', CONFIG.PROXY_URL);
 
@@ -1039,9 +1039,19 @@ function importExcelData() {
             detectedMapping.scoreColumns.forEach((colIdx, idx) => {
                 const scoreValue = row[colIdx];
                 const columnName = scoreColumnNames[idx];
-                scores[columnName] = scoreValue !== undefined && scoreValue !== null && scoreValue !== '' 
-                    ? String(scoreValue) 
-                    : '';
+                
+                // Round score to 2 decimal places if it's a number
+                let processedScore = '';
+                if (scoreValue !== undefined && scoreValue !== null && scoreValue !== '') {
+                    const numValue = parseFloat(scoreValue);
+                    if (!isNaN(numValue)) {
+                        processedScore = String(Math.round(numValue * 100) / 100);
+                    } else {
+                        processedScore = String(scoreValue);
+                    }
+                }
+                
+                scores[columnName] = processedScore;
             });
             
             students.push({
