@@ -371,7 +371,20 @@ function renderStudentsTable() {
         // Add score inputs
         scoreColumns.forEach(col => {
             const score = student.scores[col] || '';
-            tableHTML += `
+            // If column is a 'điểm cộng' column, treat it as text (allow 'x' or notes)
+            if (isColumnText(currentRecord, col)) {
+                tableHTML += `
+                <td>
+                    <input type="text"
+                           value="${score}"
+                           data-student-index="${index}"
+                           data-column="${col}"
+                           onchange="updateStudentScore(${index}, '${col}', this.value)"
+                           placeholder="VD: x hoặc ghi chú">
+                </td>
+            `;
+            } else {
+                tableHTML += `
                 <td>
                     <input type="number" 
                            step="0.1" 
@@ -384,6 +397,7 @@ function renderStudentsTable() {
                            placeholder="0-10">
                 </td>
             `;
+            }
         });
 
         tableHTML += `
@@ -411,6 +425,46 @@ function updateStudentScore(studentIndex, column, value) {
     }
     currentRecord.students[studentIndex].scores[column] = value;
     console.log('Updated score:', studentIndex, column, value);
+}
+
+// Helper: normalize string and remove accents to compare column names
+function normalizeForCompare(s) {
+    if (!s) return '';
+    // remove diacritics
+    // Use NFD and strip combining marks (covers accents) for broader browser support
+    const normalized = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return normalized.toLowerCase().trim();
+}
+
+// Check if a score column should be treated as text (e.g., contains "điểm cộng")
+function isTextScoreColumn(columnName) {
+    const key = normalizeForCompare(columnName || '');
+    // match 'điểm cộng' in many forms, without accent and case-insensitive
+    return key.includes('diem cong') || key.includes('điem cong') || key.includes('điểm cộng');
+}
+
+// Determine if a column should be treated as text based on name OR existing data
+function isColumnText(record, columnName) {
+    // If column name explicitly indicates text, return true
+    if (isTextScoreColumn(columnName)) return true;
+
+    // If record not provided, fallback to name-based detection
+    if (!record || !record.students) return isTextScoreColumn(columnName);
+
+    // If any student has a non-numeric value for this column, treat as text
+    for (const student of record.students) {
+        if (!student || !student.scores) continue;
+        const v = student.scores[columnName];
+        if (v === undefined || v === null || String(v).trim() === '') continue;
+        const s = String(v).trim();
+        // Allow numbers like '8', '8.5', '7,5'
+        const numeric = !isNaN(parseFloat(s.replace(',', '.')));
+        if (!numeric) return true;
+        // If numeric but contains letters, treat as text (defensive)
+        if (/[a-zA-Z]/.test(s)) return true;
+    }
+
+    return false;
 }
 
 // Add score column
@@ -462,7 +516,19 @@ function openStudentModal(studentIndex) {
     let scoresHTML = '<div class="scores-grid">';
     scoreColumns.forEach(col => {
         const score = isEdit && currentStudent.scores ? (currentStudent.scores[col] || '') : '';
-        scoresHTML += `
+        if (isColumnText(currentRecord, col)) {
+            scoresHTML += `
+            <div class="score-item">
+                <label>${col}:</label>
+                <input type="text"
+                       value="${score}"
+                       data-column="${col}"
+                       class="student-score-input"
+                       placeholder="VD: x hoặc ghi chú">
+            </div>
+        `;
+        } else {
+            scoresHTML += `
             <div class="score-item">
                 <label>${col}:</label>
                 <input type="number" 
@@ -475,6 +541,7 @@ function openStudentModal(studentIndex) {
                        placeholder="0-10">
             </div>
         `;
+        }
     });
     scoresHTML += '</div>';
 
