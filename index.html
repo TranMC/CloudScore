@@ -85,6 +85,39 @@
                         </div>
                     </div>
                     
+                    <!-- Search and Filter Controls -->
+                    <div class="table-controls">
+                        <div class="search-control">
+                            <span class="control-icon">🔍</span>
+                            <input type="text" id="studentSearchInput" placeholder="Tìm kiếm theo tên học sinh...">
+                        </div>
+                        <div class="filter-controls">
+                            <div class="filter-item">
+                                <label>
+                                    <span class="control-icon">📋</span>
+                                    Hiển thị cột:
+                                </label>
+                                <button id="columnVisibilityBtn" class="btn-filter">
+                                    <span>⚙️</span> Chọn cột
+                                </button>
+                            </div>
+                            <div class="filter-item">
+                                <label>
+                                    <span class="control-icon">🎯</span>
+                                    Lọc theo:
+                                </label>
+                                <select id="filterByScore" class="filter-select">
+                                    <option value="all">Tất cả học sinh</option>
+                                    <option value="has-value">Có điểm</option>
+                                    <option value="no-value">Chưa có điểm</option>
+                                </select>
+                                <select id="filterColumn" class="filter-select" style="display:none;">
+                                    <option value="">-- Chọn cột --</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div id="studentsTable">
                         <!-- Bảng học sinh sẽ được tạo ở đây -->
                     </div>

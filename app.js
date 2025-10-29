@@ -13,6 +13,7 @@ let currentRecord = null;
 let currentStudent = null;
 let isEditMode = false;
 let scoreColumns = ['Điểm giữa kỳ', 'Điểm cuối kỳ']; // Default columns
+let visibleColumns = []; // Track visible columns (empty means all visible)
 
 // DOM Elements - will be initialized after DOM loads
 let cardsContainer, detailModal, studentModal, batchModal, searchInput;
@@ -177,6 +178,42 @@ function setupEventListeners() {
     document.getElementById('cancelBatchBtn').addEventListener('click', () => {
         batchModal.style.display = 'none';
     });
+
+    // Student search/filter controls
+    const studentSearchInput = document.getElementById('studentSearchInput');
+    const columnVisibilityBtn = document.getElementById('columnVisibilityBtn');
+    const filterByScore = document.getElementById('filterByScore');
+    const filterColumn = document.getElementById('filterColumn');
+
+    if (studentSearchInput) {
+        studentSearchInput.addEventListener('input', () => {
+            renderStudentsTable();
+        });
+    }
+
+    if (columnVisibilityBtn) {
+        columnVisibilityBtn.addEventListener('click', toggleColumnVisibility);
+    }
+
+    if (filterByScore) {
+        filterByScore.addEventListener('change', () => {
+            const filterColumnSelect = document.getElementById('filterColumn');
+            if (filterByScore.value === 'all') {
+                filterColumnSelect.style.display = 'none';
+            } else {
+                filterColumnSelect.style.display = 'inline-block';
+                // Populate column dropdown
+                populateFilterColumnDropdown();
+            }
+            renderStudentsTable();
+        });
+    }
+
+    if (filterColumn) {
+        filterColumn.addEventListener('change', () => {
+            renderStudentsTable();
+        });
+    }
 }
 
 // Load records from backend via proxy
@@ -311,6 +348,19 @@ function openRecordModal(record) {
 
     // Set score columns from record or use default
     scoreColumns = currentRecord.scoreColumns || scoreColumns;
+    
+    // Reset filters and column visibility
+    visibleColumns = [];
+    const studentSearchInput = document.getElementById('studentSearchInput');
+    const filterByScore = document.getElementById('filterByScore');
+    const filterColumn = document.getElementById('filterColumn');
+    
+    if (studentSearchInput) studentSearchInput.value = '';
+    if (filterByScore) filterByScore.value = 'all';
+    if (filterColumn) {
+        filterColumn.value = '';
+        filterColumn.style.display = 'none';
+    }
 
     // Fill form
     document.getElementById('modalTitle').textContent = 
@@ -329,13 +379,95 @@ function openRecordModal(record) {
     detailModal.style.display = 'block';
 }
 
+// Filter students based on search and filter criteria
+function getFilteredStudents() {
+    const students = currentRecord.students || [];
+    const searchTerm = document.getElementById('studentSearchInput')?.value.toLowerCase().trim() || '';
+    const filterType = document.getElementById('filterByScore')?.value || 'all';
+    const filterCol = document.getElementById('filterColumn')?.value || '';
+
+    let filtered = students;
+
+    // Apply search filter
+    if (searchTerm) {
+        filtered = filtered.filter(student => 
+            student.name.toLowerCase().includes(searchTerm)
+        );
+    }
+
+    // Apply score filter
+    if (filterType !== 'all' && filterCol) {
+        filtered = filtered.filter(student => {
+            const hasValue = student.scores && student.scores[filterCol] && 
+                             String(student.scores[filterCol]).trim() !== '';
+            return filterType === 'has-value' ? hasValue : !hasValue;
+        });
+    }
+
+    return filtered;
+}
+
+// Get visible columns (respects column visibility settings)
+function getVisibleColumns() {
+    // If visibleColumns is empty, show all columns
+    if (visibleColumns.length === 0) {
+        return scoreColumns;
+    }
+    // Otherwise, only show selected columns
+    return scoreColumns.filter(col => visibleColumns.includes(col));
+}
+
+// Populate filter column dropdown with current score columns
+function populateFilterColumnDropdown() {
+    const filterColumnSelect = document.getElementById('filterColumn');
+    if (!filterColumnSelect) return;
+
+    filterColumnSelect.innerHTML = '<option value="">-- Chọn cột --</option>';
+    scoreColumns.forEach(col => {
+        const option = document.createElement('option');
+        option.value = col;
+        option.textContent = col;
+        filterColumnSelect.appendChild(option);
+    });
+}
+
+// Toggle column visibility modal/dropdown
+function toggleColumnVisibility() {
+    const message = scoreColumns.map((col, idx) => {
+        const isVisible = visibleColumns.length === 0 || visibleColumns.includes(col);
+        return `${idx + 1}. ${col} - ${isVisible ? 'Hiển thị' : 'Ẩn'}`;
+    }).join('\n');
+
+    const input = prompt(
+        `Chọn cột để hiển thị (nhập số cột cách nhau bằng dấu phẩy):\n\n${message}\n\nVí dụ: 1,3,5 (để hiện tất cả, bỏ trống)`,
+        visibleColumns.length === 0 ? '' : scoreColumns
+            .map((col, idx) => visibleColumns.includes(col) ? idx + 1 : null)
+            .filter(x => x !== null)
+            .join(',')
+    );
+
+    if (input === null) return; // User cancelled
+
+    if (input.trim() === '') {
+        // Show all columns
+        visibleColumns = [];
+    } else {
+        // Parse selected columns
+        const indices = input.split(',').map(s => parseInt(s.trim()) - 1).filter(i => i >= 0 && i < scoreColumns.length);
+        visibleColumns = indices.map(i => scoreColumns[i]);
+    }
+
+    renderStudentsTable();
+}
+
 // Render students table
 function renderStudentsTable() {
     const studentsTable = document.getElementById('studentsTable');
-    const students = currentRecord.students || [];
+    const students = getFilteredStudents();
+    const visibleCols = getVisibleColumns();
 
     if (students.length === 0) {
-        studentsTable.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Chưa có học sinh. Nhấn "Thêm học sinh" hoặc "Import hàng loạt".</p>';
+        studentsTable.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Không tìm thấy học sinh phù hợp.</p>';
         return;
     }
 
@@ -348,8 +480,8 @@ function renderStudentsTable() {
                         <th>Họ và tên</th>
     `;
 
-    // Add score column headers
-    scoreColumns.forEach(col => {
+    // Add score column headers (only visible ones)
+    visibleCols.forEach(col => {
         tableHTML += `<th>${col} <button class="btn-icon delete" onclick="removeScoreColumn('${col}')" title="Xóa cột">×</button></th>`;
     });
 
@@ -362,14 +494,17 @@ function renderStudentsTable() {
 
     // Add student rows
     students.forEach((student, index) => {
+        // Find original index in full student list for editing
+        const originalIndex = currentRecord.students.indexOf(student);
+        
         tableHTML += `
             <tr>
                 <td>${index + 1}</td>
                 <td>${student.name}</td>
         `;
 
-        // Add score inputs
-        scoreColumns.forEach(col => {
+        // Add score inputs (only visible columns)
+        visibleCols.forEach(col => {
             const score = student.scores[col] || '';
             // If column is a 'điểm cộng' column, treat it as text (allow 'x' or notes)
             if (isColumnText(currentRecord, col)) {
@@ -377,9 +512,9 @@ function renderStudentsTable() {
                 <td>
                     <input type="text"
                            value="${score}"
-                           data-student-index="${index}"
+                           data-student-index="${originalIndex}"
                            data-column="${col}"
-                           onchange="updateStudentScore(${index}, '${col}', this.value)"
+                           onchange="updateStudentScore(${originalIndex}, '${col}', this.value)"
                            placeholder="VD: x hoặc ghi chú">
                 </td>
             `;
@@ -391,9 +526,9 @@ function renderStudentsTable() {
                            min="0" 
                            max="10"
                            value="${score}"
-                           data-student-index="${index}"
+                           data-student-index="${originalIndex}"
                            data-column="${col}"
-                           onchange="updateStudentScore(${index}, '${col}', this.value)"
+                           onchange="updateStudentScore(${originalIndex}, '${col}', this.value)"
                            placeholder="0-10">
                 </td>
             `;
@@ -402,8 +537,8 @@ function renderStudentsTable() {
 
         tableHTML += `
                 <td class="student-actions">
-                    <button class="btn-icon edit" onclick="openStudentModal(${index})" title="Sửa">✏️</button>
-                    <button class="btn-icon delete" onclick="deleteStudent(${index})" title="Xóa">🗑️</button>
+                    <button class="btn-icon edit" onclick="openStudentModal(${originalIndex})" title="Sửa">✏️</button>
+                    <button class="btn-icon delete" onclick="deleteStudent(${originalIndex})" title="Xóa">🗑️</button>
                 </td>
             </tr>
         `;
