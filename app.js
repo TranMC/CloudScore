@@ -19,6 +19,10 @@ let visibleColumns = []; // Track visible columns (empty means all visible)
 let cardsContainer, detailModal, studentModal, batchModal, searchInput;
 let errorPopup, errorPopupMsg, errorPopupIcon, errorPopupClose, loadingPopup, loadingPopupMsg;
 let confirmPopup, confirmPopupMsg, confirmPopupYes, confirmPopupNo;
+let columnVisibilityModal, columnCheckboxList;
+let columnModal, columnNameInput, columnModalTitle, columnModalIcon, columnModalTitleText;
+let oldColumnInfo, oldColumnName, columnNameError, confirmColumnAction, confirmColumnText, confirmColumnIcon;
+let currentEditingColumn = null; // Track if we're editing or adding
 let confirmCallback = null;
 
 // Popup functions
@@ -94,6 +98,23 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmPopupMsg = document.getElementById('confirmPopupMsg');
     confirmPopupYes = document.getElementById('confirmPopupYes');
     confirmPopupNo = document.getElementById('confirmPopupNo');
+    
+    // Initialize column visibility modal elements
+    columnVisibilityModal = document.getElementById('columnVisibilityModal');
+    columnCheckboxList = document.getElementById('columnCheckboxList');
+    
+    // Initialize column modal elements
+    columnModal = document.getElementById('columnModal');
+    columnNameInput = document.getElementById('columnNameInput');
+    columnModalTitle = document.getElementById('columnModalTitle');
+    columnModalIcon = document.getElementById('columnModalIcon');
+    columnModalTitleText = document.getElementById('columnModalTitleText');
+    oldColumnInfo = document.getElementById('oldColumnInfo');
+    oldColumnName = document.getElementById('oldColumnName');
+    columnNameError = document.getElementById('columnNameError');
+    confirmColumnAction = document.getElementById('confirmColumnAction');
+    confirmColumnText = document.getElementById('confirmColumnText');
+    confirmColumnIcon = document.getElementById('confirmColumnIcon');
     
     // Setup popup close button
     if (errorPopupClose) {
@@ -212,6 +233,69 @@ function setupEventListeners() {
     if (filterColumn) {
         filterColumn.addEventListener('change', () => {
             renderStudentsTable();
+        });
+    }
+    
+    // Column visibility modal controls
+    const selectAllColumns = document.getElementById('selectAllColumns');
+    const deselectAllColumns = document.getElementById('deselectAllColumns');
+    const applyColumnVisibility = document.getElementById('applyColumnVisibility');
+    const cancelColumnVisibility = document.getElementById('cancelColumnVisibility');
+    
+    if (selectAllColumns) {
+        selectAllColumns.addEventListener('click', () => {
+            document.querySelectorAll('#columnCheckboxList input[type="checkbox"]').forEach(cb => {
+                cb.checked = true;
+                cb.closest('.column-checkbox-item').classList.add('checked');
+            });
+        });
+    }
+    
+    if (deselectAllColumns) {
+        deselectAllColumns.addEventListener('click', () => {
+            document.querySelectorAll('#columnCheckboxList input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+                cb.closest('.column-checkbox-item').classList.remove('checked');
+            });
+        });
+    }
+    
+    if (applyColumnVisibility) {
+        applyColumnVisibility.addEventListener('click', applyColumnVisibilityChanges);
+    }
+    
+    if (cancelColumnVisibility) {
+        cancelColumnVisibility.addEventListener('click', () => {
+            columnVisibilityModal.style.display = 'none';
+        });
+    }
+    
+    // Column modal controls
+    const cancelColumnAction = document.getElementById('cancelColumnAction');
+    
+    if (confirmColumnAction) {
+        confirmColumnAction.addEventListener('click', handleColumnAction);
+    }
+    
+    if (cancelColumnAction) {
+        cancelColumnAction.addEventListener('click', () => {
+            columnModal.style.display = 'none';
+            currentEditingColumn = null;
+        });
+    }
+    
+    if (columnNameInput) {
+        // Clear error on input
+        columnNameInput.addEventListener('input', () => {
+            columnNameInput.classList.remove('error');
+            columnNameError.style.display = 'none';
+        });
+        
+        // Submit on Enter key
+        columnNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleColumnAction();
+            }
         });
     }
 }
@@ -433,31 +517,82 @@ function populateFilterColumnDropdown() {
 
 // Toggle column visibility modal/dropdown
 function toggleColumnVisibility() {
-    const message = scoreColumns.map((col, idx) => {
-        const isVisible = visibleColumns.length === 0 || visibleColumns.includes(col);
-        return `${idx + 1}. ${col} - ${isVisible ? 'Hiển thị' : 'Ẩn'}`;
-    }).join('\n');
-
-    const input = prompt(
-        `Chọn cột để hiển thị (nhập số cột cách nhau bằng dấu phẩy):\n\n${message}\n\nVí dụ: 1,3,5 (để hiện tất cả, bỏ trống)`,
-        visibleColumns.length === 0 ? '' : scoreColumns
-            .map((col, idx) => visibleColumns.includes(col) ? idx + 1 : null)
-            .filter(x => x !== null)
-            .join(',')
-    );
-
-    if (input === null) return; // User cancelled
-
-    if (input.trim() === '') {
-        // Show all columns
-        visibleColumns = [];
-    } else {
-        // Parse selected columns
-        const indices = input.split(',').map(s => parseInt(s.trim()) - 1).filter(i => i >= 0 && i < scoreColumns.length);
-        visibleColumns = indices.map(i => scoreColumns[i]);
+    if (!columnVisibilityModal || !columnCheckboxList) {
+        console.error('Column visibility modal not initialized');
+        return;
     }
+    
+    // Populate checkbox list
+    columnCheckboxList.innerHTML = '';
+    
+    scoreColumns.forEach((col, idx) => {
+        const isVisible = visibleColumns.length === 0 || visibleColumns.includes(col);
+        
+        const item = document.createElement('div');
+        item.className = 'column-checkbox-item' + (isVisible ? ' checked' : '');
+        
+        const indexSpan = document.createElement('span');
+        indexSpan.className = 'column-index';
+        indexSpan.textContent = idx + 1;
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `colVis_${idx}`;
+        checkbox.value = col;
+        checkbox.checked = isVisible;
+        
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                item.classList.add('checked');
+            } else {
+                item.classList.remove('checked');
+            }
+        });
+        
+        const label = document.createElement('label');
+        label.htmlFor = `colVis_${idx}`;
+        label.textContent = col;
+        
+        item.addEventListener('click', function(e) {
+            if (e.target.tagName !== 'INPUT') {
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('change'));
+            }
+        });
+        
+        item.appendChild(indexSpan);
+        item.appendChild(checkbox);
+        item.appendChild(label);
+        columnCheckboxList.appendChild(item);
+    });
+    
+    // Show modal
+    columnVisibilityModal.style.display = 'block';
+}
 
+// Apply column visibility changes
+function applyColumnVisibilityChanges() {
+    const checkedBoxes = document.querySelectorAll('#columnCheckboxList input[type="checkbox"]:checked');
+    
+    if (checkedBoxes.length === 0) {
+        // No columns selected = show all
+        visibleColumns = [];
+        showErrorPopup('✅ Hiển thị tất cả các cột', true);
+    } else if (checkedBoxes.length === scoreColumns.length) {
+        // All columns selected = show all
+        visibleColumns = [];
+        showErrorPopup('✅ Hiển thị tất cả các cột', true);
+    } else {
+        // Some columns selected
+        visibleColumns = Array.from(checkedBoxes).map(cb => cb.value);
+        showErrorPopup(`✅ Hiển thị ${checkedBoxes.length}/${scoreColumns.length} cột`, true);
+    }
+    
+    // Re-render table
     renderStudentsTable();
+    
+    // Close modal
+    columnVisibilityModal.style.display = 'none';
 }
 
 // Render students table
@@ -482,7 +617,7 @@ function renderStudentsTable() {
 
     // Add score column headers (only visible ones)
     visibleCols.forEach(col => {
-        tableHTML += `<th>${col} <button class="btn-icon delete" onclick="removeScoreColumn('${col}')" title="Xóa cột">×</button></th>`;
+        tableHTML += `<th>${col} <button class="btn-icon edit" onclick="editScoreColumn('${col}')" title="Sửa tên cột">✏️</button> <button class="btn-icon delete" onclick="removeScoreColumn('${col}')" title="Xóa cột">×</button></th>`;
     });
 
     tableHTML += `
@@ -604,18 +739,146 @@ function isColumnText(record, columnName) {
 
 // Add score column
 function addScoreColumn() {
-    const columnName = prompt('Nhập tên cột điểm:', 'Điểm thực hành');
-    if (!columnName || !columnName.trim()) return;
+    openColumnModal('add', null);
+}
 
-    const trimmedName = columnName.trim();
-    if (scoreColumns.includes(trimmedName)) {
-        showErrorPopup('Cột này đã tồn tại!');
+// Open column modal for add or edit
+function openColumnModal(mode, oldName = null) {
+    if (!columnModal || !columnNameInput) {
+        console.error('Column modal not initialized');
         return;
     }
+    
+    currentEditingColumn = oldName;
+    
+    // Reset error state
+    columnNameInput.classList.remove('error');
+    columnNameError.style.display = 'none';
+    
+    if (mode === 'edit' && oldName) {
+        // Edit mode
+        columnModalIcon.textContent = '✏️';
+        columnModalTitleText.textContent = 'Sửa tên cột điểm';
+        columnNameInput.value = oldName;
+        columnNameInput.placeholder = 'Nhập tên cột mới...';
+        document.getElementById('columnModalHint').textContent = 'Nhập tên mới cho cột điểm. Tên cột phải là duy nhất.';
+        confirmColumnText.textContent = 'Cập nhật';
+        confirmColumnIcon.textContent = '💾';
+        
+        // Show old column info
+        oldColumnInfo.style.display = 'block';
+        oldColumnName.textContent = oldName;
+    } else {
+        // Add mode
+        columnModalIcon.textContent = '➕';
+        columnModalTitleText.textContent = 'Thêm cột điểm mới';
+        columnNameInput.value = '';
+        columnNameInput.placeholder = 'VD: Điểm giữa kỳ, Điểm cuối kỳ...';
+        document.getElementById('columnModalHint').textContent = 'Nhập tên cột điểm. Ví dụ: Điểm giữa kỳ, Điểm cuối kỳ, Điểm thực hành...';
+        confirmColumnText.textContent = 'Thêm';
+        confirmColumnIcon.textContent = '✔️';
+        
+        // Hide old column info
+        oldColumnInfo.style.display = 'none';
+    }
+    
+    // Show modal and focus input
+    columnModal.style.display = 'block';
+    setTimeout(() => {
+        columnNameInput.focus();
+        columnNameInput.select();
+    }, 100);
+}
 
-    scoreColumns.push(trimmedName);
-    currentRecord.scoreColumns = scoreColumns;
-    renderStudentsTable();
+// Handle column action (add or edit)
+function handleColumnAction() {
+    const newName = columnNameInput.value.trim();
+    
+    // Validate
+    if (!newName) {
+        showColumnError('Vui lòng nhập tên cột');
+        return;
+    }
+    
+    if (currentEditingColumn === null) {
+        // Add mode
+        if (scoreColumns.includes(newName)) {
+            showColumnError('Tên cột này đã tồn tại!');
+            return;
+        }
+        
+        // Add new column
+        scoreColumns.push(newName);
+        currentRecord.scoreColumns = scoreColumns;
+        
+        columnModal.style.display = 'none';
+        renderStudentsTable();
+        showErrorPopup('✅ Đã thêm cột mới thành công!', true);
+    } else {
+        // Edit mode
+        const oldName = currentEditingColumn;
+        
+        // Check if name unchanged
+        if (newName === oldName) {
+            columnModal.style.display = 'none';
+            return;
+        }
+        
+        // Check if new name already exists
+        if (scoreColumns.includes(newName)) {
+            showColumnError('Tên cột này đã tồn tại!');
+            return;
+        }
+        
+        // Update column name in scoreColumns array
+        const columnIndex = scoreColumns.indexOf(oldName);
+        if (columnIndex !== -1) {
+            scoreColumns[columnIndex] = newName;
+            currentRecord.scoreColumns = scoreColumns;
+        }
+        
+        // Update column name in all students' scores
+        currentRecord.students.forEach(student => {
+            if (student.scores && student.scores.hasOwnProperty(oldName)) {
+                student.scores[newName] = student.scores[oldName];
+                delete student.scores[oldName];
+            }
+        });
+        
+        // Update visible columns if applicable
+        if (visibleColumns.length > 0) {
+            const visibleIndex = visibleColumns.indexOf(oldName);
+            if (visibleIndex !== -1) {
+                visibleColumns[visibleIndex] = newName;
+            }
+        }
+        
+        // Re-render the table
+        renderStudentsTable();
+        
+        // Update filter column dropdown if it's visible
+        const filterColumn = document.getElementById('filterColumn');
+        if (filterColumn && filterColumn.style.display !== 'none') {
+            populateFilterColumnDropdown();
+        }
+        
+        columnModal.style.display = 'none';
+        currentEditingColumn = null;
+        showErrorPopup('✅ Đã đổi tên cột thành công!', true);
+    }
+}
+
+// Show column error
+function showColumnError(message) {
+    columnNameInput.classList.add('error');
+    columnNameError.querySelector('.error-text').textContent = message;
+    columnNameError.style.display = 'flex';
+    columnNameInput.focus();
+}
+
+// Edit score column name
+function editScoreColumn(oldColumnName) {
+    openColumnModal('edit', oldColumnName);
 }
 
 // Remove score column

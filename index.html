@@ -241,33 +241,51 @@
         </div>
     </div>
 
-    <!-- Modal thêm cột điểm -->
+    <!-- Modal thêm/sửa cột điểm -->
     <div id="columnModal" class="modal">
         <div class="modal-content modal-small">
             <div class="modal-header">
-                <h3>
-                    <span class="modal-icon">➕</span>
-                    Thêm cột điểm mới
+                <h3 id="columnModalTitle">
+                    <span class="modal-icon" id="columnModalIcon">➕</span>
+                    <span id="columnModalTitleText">Thêm cột điểm mới</span>
                 </h3>
                 <span class="close">&times;</span>
             </div>
             
             <div class="modal-body">
+                <div class="info-notice">
+                    <span class="notice-icon">💡</span>
+                    <div>
+                        <p id="columnModalHint">Nhập tên cột điểm. Ví dụ: Điểm giữa kỳ, Điểm cuối kỳ, Điểm thực hành...</p>
+                    </div>
+                </div>
+
                 <div class="info-group">
                     <label>
                         <span class="label-icon">📊</span>
                         Tên cột:
                     </label>
-                    <input type="text" id="newColumnName" placeholder="VD: Điểm giữa kỳ, Điểm cuối kỳ...">
+                    <input type="text" id="columnNameInput" placeholder="VD: Điểm giữa kỳ, Điểm cuối kỳ..." autocomplete="off">
+                    <div id="columnNameError" class="input-error" style="display: none;">
+                        <span class="error-icon">⚠️</span>
+                        <span class="error-text"></span>
+                    </div>
+                </div>
+
+                <div id="oldColumnInfo" class="old-column-info" style="display: none;">
+                    <div class="info-row">
+                        <span class="info-label">Tên cột hiện tại:</span>
+                        <span class="info-value" id="oldColumnName">-</span>
+                    </div>
                 </div>
             </div>
             
             <div class="modal-footer">
-                <button id="confirmAddColumn" class="btn-primary">
-                    <span class="btn-icon-prefix">✔️</span>
-                    Thêm
+                <button id="confirmColumnAction" class="btn-primary">
+                    <span class="btn-icon-prefix" id="confirmColumnIcon">✔️</span>
+                    <span id="confirmColumnText">Thêm</span>
                 </button>
-                <button id="cancelAddColumn" class="btn-secondary">
+                <button id="cancelColumnAction" class="btn-secondary">
                     <span class="btn-icon-prefix">✖️</span>
                     Hủy
                 </button>
@@ -444,6 +462,54 @@
             <div style="display: flex; gap: 10px; justify-content: center;">
                 <button id="confirmPopupYes" class="btn-primary">Đồng ý</button>
                 <button id="confirmPopupNo" class="btn-secondary">Hủy</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal chọn cột hiển thị -->
+    <div id="columnVisibilityModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>
+                    <span class="modal-icon">👁️</span>
+                    Chọn cột hiển thị
+                </h3>
+                <span class="close">&times;</span>
+            </div>
+            
+            <div class="modal-body">
+                <div class="info-notice">
+                    <span class="notice-icon">💡</span>
+                    <div>
+                        <p><strong>Gợi ý:</strong> Chọn các cột điểm bạn muốn hiển thị trong bảng. Nếu không chọn cột nào, tất cả các cột sẽ được hiển thị.</p>
+                    </div>
+                </div>
+
+                <div class="column-visibility-options">
+                    <div class="quick-actions">
+                        <button id="selectAllColumns" class="btn-small btn-secondary">
+                            <span>✓</span> Chọn tất cả
+                        </button>
+                        <button id="deselectAllColumns" class="btn-small btn-secondary">
+                            <span>✗</span> Bỏ chọn tất cả
+                        </button>
+                    </div>
+                    
+                    <div id="columnCheckboxList" class="column-checkbox-list">
+                        <!-- Checkboxes will be generated here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button id="applyColumnVisibility" class="btn-primary">
+                    <span class="btn-icon-prefix">✔️</span>
+                    Áp dụng
+                </button>
+                <button id="cancelColumnVisibility" class="btn-secondary">
+                    <span class="btn-icon-prefix">✖️</span>
+                    Hủy
+                </button>
             </div>
         </div>
     </div>
