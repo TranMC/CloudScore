@@ -14,6 +14,9 @@ let currentStudent = null;
 let isEditMode = false;
 let scoreColumns = ['Điểm giữa kỳ', 'Điểm cuối kỳ']; // Default columns
 let visibleColumns = []; // Track visible columns (empty means all visible)
+let autoSaveTimer = null;
+let hasUnsavedChanges = false;
+let isStatsCollapsed = false;
 
 // DOM Elements - will be initialized after DOM loads
 let cardsContainer, detailModal, studentModal, batchModal, searchInput;
@@ -22,6 +25,7 @@ let confirmPopup, confirmPopupMsg, confirmPopupYes, confirmPopupNo;
 let columnVisibilityModal, columnCheckboxList;
 let columnModal, columnNameInput, columnModalTitle, columnModalIcon, columnModalTitleText;
 let oldColumnInfo, oldColumnName, columnNameError, confirmColumnAction, confirmColumnText, confirmColumnIcon;
+let saveStatusElement, toggleStatsBtn, toggleStatsIcon, statsContent;
 let currentEditingColumn = null; // Track if we're editing or adding
 let confirmCallback = null;
 
@@ -116,6 +120,14 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmColumnText = document.getElementById('confirmColumnText');
     confirmColumnIcon = document.getElementById('confirmColumnIcon');
     
+    // Initialize auto-save status
+    saveStatusElement = document.getElementById('saveStatus');
+    
+    // Initialize statistics toggle
+    toggleStatsBtn = document.getElementById('toggleStatsBtn');
+    toggleStatsIcon = document.getElementById('toggleStatsIcon');
+    statsContent = document.getElementById('statsContent');
+    
     // Setup popup close button
     if (errorPopupClose) {
         errorPopupClose.onclick = hideErrorPopup;
@@ -133,8 +145,16 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
     
+    // Statistics toggle
+    if (toggleStatsBtn) {
+        toggleStatsBtn.addEventListener('click', toggleStatistics);
+    }
+    
     setupEventListeners();
     loadRecords();
+    
+    // Load auto-save draft if exists
+    loadAutoSaveDraft();
 });
 
 // Event Listeners
@@ -603,6 +623,7 @@ function renderStudentsTable() {
 
     if (students.length === 0) {
         studentsTable.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Không tìm thấy học sinh phù hợp.</p>';
+        updateStatistics();
         return;
     }
 
@@ -619,6 +640,9 @@ function renderStudentsTable() {
     visibleCols.forEach(col => {
         tableHTML += `<th>${col} <button class="btn-icon edit" onclick="editScoreColumn('${col}')" title="Sửa tên cột">✏️</button> <button class="btn-icon delete" onclick="removeScoreColumn('${col}')" title="Xóa cột">×</button></th>`;
     });
+    
+    // Add average column
+    tableHTML += `<th style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(16, 185, 129, 0.2));">📊 Điểm TB</th>`;
 
     tableHTML += `
                         <th style="width: 100px;">Thao tác</th>
@@ -631,6 +655,11 @@ function renderStudentsTable() {
     students.forEach((student, index) => {
         // Find original index in full student list for editing
         const originalIndex = currentRecord.students.indexOf(student);
+        
+        // Calculate average
+        const avg = calculateStudentAverage(student, scoreColumns);
+        const avgClass = getAverageClass(avg);
+        const avgDisplay = avg !== null ? avg.toFixed(2) : '-';
         
         tableHTML += `
             <tr>
@@ -669,6 +698,11 @@ function renderStudentsTable() {
             `;
             }
         });
+        
+        // Add average cell
+        tableHTML += `
+                <td class="avg-score-cell ${avgClass}">${avgDisplay}</td>
+        `;
 
         tableHTML += `
                 <td class="student-actions">
@@ -686,6 +720,9 @@ function renderStudentsTable() {
     `;
 
     studentsTable.innerHTML = tableHTML;
+    
+    // Update statistics after rendering
+    updateStatistics();
 }
 
 // Update student score
@@ -695,6 +732,13 @@ function updateStudentScore(studentIndex, column, value) {
     }
     currentRecord.students[studentIndex].scores[column] = value;
     console.log('Updated score:', studentIndex, column, value);
+    
+    // Mark as unsaved and trigger auto-save
+    markAsUnsaved();
+    triggerAutoSave();
+    
+    // Update statistics
+    updateStatistics();
 }
 
 // Helper: normalize string and remove accents to compare column names
@@ -814,6 +858,10 @@ function handleColumnAction() {
         columnModal.style.display = 'none';
         renderStudentsTable();
         showErrorPopup('✅ Đã thêm cột mới thành công!', true);
+        
+        // Mark as unsaved and trigger auto-save
+        markAsUnsaved();
+        triggerAutoSave();
     } else {
         // Edit mode
         const oldName = currentEditingColumn;
@@ -865,6 +913,10 @@ function handleColumnAction() {
         columnModal.style.display = 'none';
         currentEditingColumn = null;
         showErrorPopup('✅ Đã đổi tên cột thành công!', true);
+        
+        // Mark as unsaved and trigger auto-save
+        markAsUnsaved();
+        triggerAutoSave();
     }
 }
 
@@ -897,6 +949,10 @@ async function removeScoreColumn(columnName) {
     });
 
     renderStudentsTable();
+    
+    // Mark as unsaved and trigger auto-save
+    markAsUnsaved();
+    triggerAutoSave();
 }
 
 // Open student modal
@@ -976,6 +1032,10 @@ function saveStudent() {
     document.getElementById('studentCount').textContent = currentRecord.students.length;
     renderStudentsTable();
     studentModal.style.display = 'none';
+    
+    // Mark as unsaved and trigger auto-save
+    markAsUnsaved();
+    triggerAutoSave();
 }
 
 // Delete student
@@ -986,6 +1046,10 @@ async function deleteStudent(index) {
     currentRecord.students.splice(index, 1);
     document.getElementById('studentCount').textContent = currentRecord.students.length;
     renderStudentsTable();
+    
+    // Mark as unsaved and trigger auto-save
+    markAsUnsaved();
+    triggerAutoSave();
 }
 
 // Batch import
@@ -1024,6 +1088,10 @@ function processBatchImport() {
     document.getElementById('studentCount').textContent = currentRecord.students.length;
     renderStudentsTable();
     batchModal.style.display = 'none';
+    
+    // Mark as unsaved and trigger auto-save
+    markAsUnsaved();
+    triggerAutoSave();
 }
 
 // Save record
@@ -1076,6 +1144,9 @@ async function saveRecord() {
         detailModal.style.display = 'none';
         hideLoadingPopup();
         showErrorPopup('Lưu thành công!', true);
+        
+        // Clear auto-save after successful save
+        clearAutoSave();
     } catch (error) {
         console.error('❌ Error saving record:', error);
         hideLoadingPopup();
@@ -1101,6 +1172,9 @@ async function deleteRecord() {
         detailModal.style.display = 'none';
         hideLoadingPopup();
         showErrorPopup('Xóa thành công!', true);
+        
+        // Clear auto-save after delete
+        clearAutoSave();
     } catch (error) {
         console.error('Error deleting record:', error);
         hideLoadingPopup();
@@ -1792,4 +1866,235 @@ function exportToPdf() {
         hideLoadingPopup();
         showErrorPopup('Lỗi khi export PDF: ' + error.message);
     }
+}
+
+// ============================================
+// STATISTICS & ANALYTICS
+// ============================================
+
+// Calculate average score for a student
+function calculateStudentAverage(student, columns) {
+    if (!student.scores) return null;
+    
+    const numericScores = [];
+    columns.forEach(col => {
+        const score = student.scores[col];
+        if (score !== undefined && score !== null && score !== '') {
+            const numValue = parseFloat(String(score).replace(',', '.'));
+            if (!isNaN(numValue) && numValue >= 0 && numValue <= 10) {
+                numericScores.push(numValue);
+            }
+        }
+    });
+    
+    if (numericScores.length === 0) return null;
+    
+    const sum = numericScores.reduce((acc, val) => acc + val, 0);
+    return sum / numericScores.length;
+}
+
+// Get CSS class for average score
+function getAverageClass(avg) {
+    if (avg === null) return '';
+    if (avg >= 8.0) return 'avg-excellent';
+    if (avg >= 6.5) return 'avg-good';
+    if (avg >= 5.0) return 'avg-average';
+    return 'avg-weak';
+}
+
+// Update statistics display
+function updateStatistics() {
+    if (!currentRecord || !currentRecord.students) return;
+    
+    const students = currentRecord.students;
+    const columns = scoreColumns;
+    
+    // Calculate all averages
+    const averages = students.map(student => calculateStudentAverage(student, columns)).filter(avg => avg !== null);
+    
+    if (averages.length === 0) {
+        // No scores yet
+        document.getElementById('statExcellent').textContent = '0';
+        document.getElementById('statExcellentPercent').textContent = '0%';
+        document.getElementById('statGood').textContent = '0';
+        document.getElementById('statGoodPercent').textContent = '0%';
+        document.getElementById('statAverage').textContent = '0';
+        document.getElementById('statAveragePercent').textContent = '0%';
+        document.getElementById('statWeak').textContent = '0';
+        document.getElementById('statWeakPercent').textContent = '0%';
+        document.getElementById('classAverage').textContent = '-';
+        document.getElementById('highestScore').textContent = '-';
+        document.getElementById('lowestScore').textContent = '-';
+        return;
+    }
+    
+    // Count by category
+    const excellent = averages.filter(avg => avg >= 8.0).length;
+    const good = averages.filter(avg => avg >= 6.5 && avg < 8.0).length;
+    const average = averages.filter(avg => avg >= 5.0 && avg < 6.5).length;
+    const weak = averages.filter(avg => avg < 5.0).length;
+    
+    const total = averages.length;
+    
+    // Update UI
+    document.getElementById('statExcellent').textContent = excellent;
+    document.getElementById('statExcellentPercent').textContent = `${((excellent / total) * 100).toFixed(1)}%`;
+    
+    document.getElementById('statGood').textContent = good;
+    document.getElementById('statGoodPercent').textContent = `${((good / total) * 100).toFixed(1)}%`;
+    
+    document.getElementById('statAverage').textContent = average;
+    document.getElementById('statAveragePercent').textContent = `${((average / total) * 100).toFixed(1)}%`;
+    
+    document.getElementById('statWeak').textContent = weak;
+    document.getElementById('statWeakPercent').textContent = `${((weak / total) * 100).toFixed(1)}%`;
+    
+    // Calculate class statistics
+    const classAvg = averages.reduce((acc, val) => acc + val, 0) / total;
+    const highest = Math.max(...averages);
+    const lowest = Math.min(...averages);
+    
+    document.getElementById('classAverage').textContent = classAvg.toFixed(2);
+    document.getElementById('highestScore').textContent = highest.toFixed(2);
+    document.getElementById('lowestScore').textContent = lowest.toFixed(2);
+}
+
+// Toggle statistics section
+function toggleStatistics() {
+    isStatsCollapsed = !isStatsCollapsed;
+    
+    if (isStatsCollapsed) {
+        statsContent.classList.add('collapsed');
+        toggleStatsIcon.classList.add('collapsed');
+    } else {
+        statsContent.classList.remove('collapsed');
+        toggleStatsIcon.classList.remove('collapsed');
+    }
+}
+
+// ============================================
+// AUTO-SAVE FUNCTIONALITY
+// ============================================
+
+const AUTO_SAVE_KEY = 'cloudscore_autosave';
+const AUTO_SAVE_DELAY = 3000; // 3 seconds after last change
+
+// Mark record as having unsaved changes
+function markAsUnsaved() {
+    hasUnsavedChanges = true;
+    updateSaveStatus('unsaved');
+}
+
+// Update save status display
+function updateSaveStatus(status) {
+    if (!saveStatusElement) return;
+    
+    saveStatusElement.classList.remove('saved', 'saving', 'error');
+    
+    switch (status) {
+        case 'saved':
+            saveStatusElement.classList.add('saved');
+            saveStatusElement.textContent = 'Đã lưu';
+            break;
+        case 'saving':
+            saveStatusElement.classList.add('saving');
+            saveStatusElement.textContent = 'Đang lưu...';
+            break;
+        case 'unsaved':
+            saveStatusElement.classList.add('saving');
+            saveStatusElement.textContent = 'Chưa lưu';
+            break;
+        case 'error':
+            saveStatusElement.classList.add('error');
+            saveStatusElement.textContent = 'Lỗi lưu';
+            break;
+    }
+}
+
+// Trigger auto-save (debounced)
+function triggerAutoSave() {
+    // Clear existing timer
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+    }
+    
+    // Set new timer
+    autoSaveTimer = setTimeout(() => {
+        performAutoSave();
+    }, AUTO_SAVE_DELAY);
+}
+
+// Perform auto-save to localStorage
+function performAutoSave() {
+    if (!currentRecord || !hasUnsavedChanges) return;
+    
+    try {
+        updateSaveStatus('saving');
+        
+        // Save to localStorage
+        const autoSaveData = {
+            record: currentRecord,
+            timestamp: new Date().toISOString(),
+            isEditMode: isEditMode
+        };
+        
+        localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(autoSaveData));
+        
+        hasUnsavedChanges = false;
+        
+        setTimeout(() => {
+            updateSaveStatus('saved');
+        }, 500);
+        
+        console.log('✅ Auto-saved successfully');
+        
+    } catch (error) {
+        console.error('❌ Auto-save error:', error);
+        updateSaveStatus('error');
+    }
+}
+
+// Load auto-save draft
+function loadAutoSaveDraft() {
+    try {
+        const savedData = localStorage.getItem(AUTO_SAVE_KEY);
+        if (!savedData) return;
+        
+        const autoSaveData = JSON.parse(savedData);
+        const savedTime = new Date(autoSaveData.timestamp);
+        const now = new Date();
+        const diffMinutes = (now - savedTime) / 1000 / 60;
+        
+        // Only load if saved within last 24 hours
+        if (diffMinutes > 60 * 24) {
+            localStorage.removeItem(AUTO_SAVE_KEY);
+            return;
+        }
+        
+        // Ask user if they want to restore
+        const message = `Phát hiện bản nháp đã lưu từ ${formatDate(autoSaveData.timestamp)}.\n\nBạn có muốn khôi phục không?`;
+        
+        showConfirmPopup(message).then(confirmed => {
+            if (confirmed) {
+                // Restore the draft
+                openRecordModal(autoSaveData.record);
+                isEditMode = autoSaveData.isEditMode;
+                showErrorPopup('✅ Đã khôi phục bản nháp!', true);
+            } else {
+                // Clear the draft
+                localStorage.removeItem(AUTO_SAVE_KEY);
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error loading auto-save:', error);
+        localStorage.removeItem(AUTO_SAVE_KEY);
+    }
+}
+
+// Clear auto-save draft
+function clearAutoSave() {
+    localStorage.removeItem(AUTO_SAVE_KEY);
+    hasUnsavedChanges = false;
+    updateSaveStatus('saved');
 }
