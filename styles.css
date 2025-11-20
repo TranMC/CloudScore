@@ -150,14 +150,14 @@ header h1 {
     background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
     border: 2px solid transparent;
     border-radius: 20px;
-    padding: 30px 25px;
+    padding: 28px 24px;
     cursor: pointer;
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     box-shadow: var(--shadow);
-    min-height: 180px;
+    min-height: 220px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
     text-align: center;
     position: relative;
@@ -195,15 +195,19 @@ header h1 {
 .card-title {
     font-size: 18px;
     font-weight: 700;
-    margin-bottom: 10px;
+    margin-bottom: 0;
     color: var(--text-primary);
     letter-spacing: -0.3px;
+    line-height: 1.4;
+    word-break: break-word;
 }
 
 .card-date {
     font-size: 13px;
     color: var(--text-secondary);
     font-weight: 500;
+    margin-top: auto;
+    padding-top: 12px;
 }
 
 .card-class {
@@ -211,9 +215,9 @@ header h1 {
     color: var(--primary-color);
     margin-top: 8px;
     font-weight: 600;
-    padding: 5px 15px;
+    padding: 6px 16px;
     background: rgba(99, 102, 241, 0.1);
-    border-radius: 20px;
+    border-radius: 18px;
 }
 
 /* Buttons */
@@ -2054,6 +2058,140 @@ textarea:focus {
     
     .summary-value {
         font-size: 16px;
+    }
+}
+
+/* Visibility Toggle Switch */
+.visibility-toggle {
+    margin-top: 8px;
+}
+
+.toggle-checkbox {
+    display: none;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.toggle-button {
+    position: relative;
+    width: 60px;
+    height: 32px;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border-radius: 16px;
+    transition: all 0.3s ease;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-button::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 26px;
+    height: 26px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-checkbox:checked + .toggle-label .toggle-button {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.toggle-checkbox:checked + .toggle-label .toggle-button::before {
+    transform: translateX(28px);
+}
+
+.toggle-label:hover .toggle-button {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-text {
+    font-weight: 600;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toggle-checkbox:not(:checked) + .toggle-label .public-text {
+    display: none;
+}
+
+.toggle-checkbox:checked + .toggle-label .private-text {
+    display: none;
+}
+
+.public-text {
+    color: #059669;
+}
+
+.private-text {
+    color: #dc2626;
+}
+
+/* Visibility Badge on Cards */
+.card-header-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 16px;
+    align-items: center;
+}
+
+.visibility-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 16px;
+    border-radius: 18px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.visibility-badge.public {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.visibility-badge.private {
+    background: linear-gradient(135deg, #64748b, #475569);
+    color: white;
+}
+
+.card:hover .visibility-badge {
+    transform: scale(1.08);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive visibility toggle */
+@media (max-width: 768px) {
+    .visibility-toggle {
+        margin-top: 10px;
+    }
+    
+    .toggle-text {
+        font-size: 14px;
+    }
+    
+    .visibility-badge {
+        font-size: 11px;
+        padding: 5px 10px;
     }
 }
 

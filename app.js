@@ -395,9 +395,15 @@ function displayCards(records) {
 
     const cardsHTML = records.map(record => {
         const studentCount = record.students ? record.students.length : 0;
+        const visibilityBadge = record.isPublic 
+            ? '<span class="visibility-badge public">🌐 Công khai</span>' 
+            : '<span class="visibility-badge private">🔒 Riêng tư</span>';
         return `
         <div class="card" data-id="${record.id}" onclick="openRecordModalById('${record.id}')">
-            <div class="card-title">${record.recordName || 'Chưa đặt tên'}</div>
+            <div class="card-header-section">
+                <div class="card-title">${record.recordName || 'Chưa đặt tên'}</div>
+                ${visibilityBadge}
+            </div>
             ${record.recordClass ? `<div class="card-class">${record.recordClass}</div>` : ''}
             <div class="card-class">${studentCount} học sinh</div>
             <div class="card-date">${formatDate(record.lastModified)}</div>
@@ -447,7 +453,8 @@ function openRecordModal(record) {
         recordClass: '',
         students: [],
         scoreColumns: ['Điểm giữa kỳ', 'Điểm cuối kỳ'],
-        lastModified: new Date().toISOString()
+        lastModified: new Date().toISOString(),
+        isPublic: false // Mặc định là riêng tư
     };
 
     // Set score columns from record or use default
@@ -473,6 +480,12 @@ function openRecordModal(record) {
     document.getElementById('recordClass').value = currentRecord.recordClass || '';
     document.getElementById('lastModified').textContent = formatDate(currentRecord.lastModified);
     document.getElementById('studentCount').textContent = currentRecord.students.length;
+    
+    // Set visibility toggle
+    const isPublicToggle = document.getElementById('isPublicToggle');
+    if (isPublicToggle) {
+        isPublicToggle.checked = currentRecord.isPublic === true;
+    }
 
     // Render students table
     renderStudentsTable();
@@ -1111,6 +1124,10 @@ async function saveRecord() {
         currentRecord.recordClass = document.getElementById('recordClass').value.trim();
         currentRecord.scoreColumns = scoreColumns;
         currentRecord.lastModified = new Date().toISOString();
+        
+        // Update visibility status
+        const isPublicToggle = document.getElementById('isPublicToggle');
+        currentRecord.isPublic = isPublicToggle ? isPublicToggle.checked : false;
 
         // Remove internal flag before sending to server
         const recordToSave = { ...currentRecord };
