@@ -255,6 +255,14 @@ function setupEventListeners() {
             renderStudentsTable();
         });
     }
+
+    // Filter by score range
+    const filterByRange = document.getElementById('filterByRange');
+    if (filterByRange) {
+        filterByRange.addEventListener('change', () => {
+            renderStudentsTable();
+        });
+    }
     
     // Column visibility modal controls
     const selectAllColumns = document.getElementById('selectAllColumns');
@@ -502,6 +510,7 @@ function getFilteredStudents() {
     const searchTerm = document.getElementById('studentSearchInput')?.value.toLowerCase().trim() || '';
     const filterType = document.getElementById('filterByScore')?.value || 'all';
     const filterCol = document.getElementById('filterColumn')?.value || '';
+    const filterRange = document.getElementById('filterByRange')?.value || 'all';
 
     let filtered = students;
 
@@ -518,6 +527,27 @@ function getFilteredStudents() {
             const hasValue = student.scores && student.scores[filterCol] && 
                              String(student.scores[filterCol]).trim() !== '';
             return filterType === 'has-value' ? hasValue : !hasValue;
+        });
+    }
+
+    // Apply score range filter (based on average score)
+    if (filterRange !== 'all') {
+        filtered = filtered.filter(student => {
+            const avg = calculateStudentAverage(student, scoreColumns);
+            if (avg === null) return false;
+
+            switch(filterRange) {
+                case 'excellent':
+                    return avg >= 8.0 && avg <= 10;
+                case 'good':
+                    return avg >= 6.5 && avg < 8.0;
+                case 'average':
+                    return avg >= 5.0 && avg < 6.5;
+                case 'weak':
+                    return avg < 5.0;
+                default:
+                    return true;
+            }
         });
     }
 
